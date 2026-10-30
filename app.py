@@ -64,13 +64,8 @@ cycle = get_current_cycle(PAYDAY)
 
 # ─── Header ───────────────────────────────────────────────────────────────────
 
-
 st.title("📅 MonthEnd")
 st.caption("Beat the month-end crunch — track every ₹, pace your cycle, kill impulse spends.")
-
-
-
-
 
 # Cycle status chip
 chip_text = cycle_status_text(cycle, INFLOW_TYPE)
@@ -128,14 +123,7 @@ with st.sidebar:
     location = st.text_input("Region", placeholder="Mumbai / Delhi / Bangalore…")
 
     st.divider()
-    with st.expander("🗑️ Reset & Clear Data", expanded=False):
-        st.caption("Erase all logged expenses, plans, inflows, liabilities, and goals from this device.")
-        if st.button("Clear All Data & Cache", type="secondary", use_container_width=True):
-            database.clear_all_data()
-            st.session_state.clear()
-            st.cache_data.clear()
-            st.success("All data and session cache cleared!")
-            st.rerun()
+    with st.expander("📥 Log Inflow", expanded=False):
         inflow_amt = st.number_input("Inflow amount (₹)", min_value=0.0, step=500.0, format="%.0f", key="inflow_amt")
         inflow_note = st.text_input("Inflow note", key="inflow_note", placeholder="October salary…")
         if st.button("Log Inflow", key="log_inflow"):
@@ -146,6 +134,15 @@ with st.sidebar:
                 )
                 st.success(f"Inflow of {format_inr(inflow_amt)} logged!")
                 st.rerun()
+
+    with st.expander("🗑️ Reset & Clear Data", expanded=False):
+        st.caption("Erase all logged expenses, plans, inflows, liabilities, and goals from this device.")
+        if st.button("Clear All Data & Cache", type="secondary", use_container_width=True):
+            database.clear_all_data()
+            st.session_state.clear()
+            st.cache_data.clear()
+            st.success("All data and session cache cleared!")
+            st.rerun()
 
 # ─── Core Budget Computation ─────────────────────────────────────────────────
 
