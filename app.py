@@ -47,7 +47,19 @@ from savings_engine import (
 
 # ─── Page Config ──────────────────────────────────────────────────────────────
 
-st.set_page_config(page_title="MonthEnd", page_icon="📅", layout="wide")
+st.set_page_config(
+    page_title="MonthEnd",
+    page_icon="📅",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+# Hide default Streamlit hamburger menu
+st.markdown("""
+<style>
+#MainMenu {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
 database.init_db()
 
 # ─── Load Settings ────────────────────────────────────────────────────────────
