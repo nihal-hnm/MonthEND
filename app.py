@@ -47,11 +47,7 @@ from savings_engine import (
 
 # ─── Page Config ──────────────────────────────────────────────────────────────
 
-
 st.set_page_config(page_title="MonthEnd", page_icon="📅", layout="wide")
-
-
-
 database.init_db()
 
 # ─── Load Settings ────────────────────────────────────────────────────────────
