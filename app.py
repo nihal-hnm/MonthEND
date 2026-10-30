@@ -47,7 +47,11 @@ from savings_engine import (
 
 # ─── Page Config ──────────────────────────────────────────────────────────────
 
+
 st.set_page_config(page_title="MonthEnd", page_icon="📅", layout="wide")
+
+
+
 database.init_db()
 
 # ─── Load Settings ────────────────────────────────────────────────────────────
@@ -64,8 +68,13 @@ cycle = get_current_cycle(PAYDAY)
 
 # ─── Header ───────────────────────────────────────────────────────────────────
 
+
 st.title("📅 MonthEnd")
 st.caption("Beat the month-end crunch — track every ₹, pace your cycle, kill impulse spends.")
+
+
+
+
 
 # Cycle status chip
 chip_text = cycle_status_text(cycle, INFLOW_TYPE)
