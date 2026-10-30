@@ -1,0 +1,16 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local database
+*.db
+*.db-journal
+*.sqlite3
+
+# Streamlit
+.streamlit/
+
+# OS files
+.DS_Store
+Thumbs.db
