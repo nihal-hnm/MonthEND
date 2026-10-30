@@ -582,6 +582,7 @@ with tab_analytics:
     # Month-over-month delta
     st.markdown("#### Category Comparison (vs. Previous Cycle)")
     deltas = mom_category_delta(cycle, PAYDAY)
+    surges: list[str] = []
     if deltas:
         delta_display = [
             {
@@ -620,7 +621,7 @@ with tab_analytics:
     st.markdown("#### 💡 Smart Saving Tips")
     goal_list = database.list_savings_goals(status="ACTIVE")
     tips = generate_habit_tips(
-        surges if deltas else [],
+        surges,
         goal_list,
         projection["daily_rate"],
     )
