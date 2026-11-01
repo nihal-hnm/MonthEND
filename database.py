@@ -123,6 +123,8 @@ def init_db(db_path=DB_PATH):
         _add_column_if_missing(conn, "expenses", "payment_mode", "TEXT NOT NULL DEFAULT 'UPI'")
         _add_column_if_missing(conn, "expenses", "is_planned", "INTEGER NOT NULL DEFAULT 1")
         _add_column_if_missing(conn, "expenses", "hour_logged", "INTEGER NOT NULL DEFAULT 12")
+        _add_column_if_missing(conn, "settings", "use_custom_days", "INTEGER NOT NULL DEFAULT 0")
+        _add_column_if_missing(conn, "settings", "custom_days_left", "INTEGER NOT NULL DEFAULT 30")
 
 
 def _add_column_if_missing(conn, table, column, typedef):
@@ -137,17 +139,26 @@ def _add_column_if_missing(conn, table, column, typedef):
 def get_settings(db_path=DB_PATH) -> dict:
     with _connection(db_path) as conn:
         row = conn.execute("SELECT * FROM settings WHERE id=1").fetchone()
-        return dict(row) if row else {
+        if row:
+            d = dict(row)
+            if "use_custom_days" not in d:
+                d["use_custom_days"] = 0
+            if "custom_days_left" not in d:
+                d["custom_days_left"] = 30
+            return d
+        return {
             "payday_day_of_month": 1, "inflow_type": "SALARY",
-            "expected_amount": "0", "currency": "₹"
+            "expected_amount": "0", "currency": "₹",
+            "use_custom_days": 0, "custom_days_left": 30
         }
 
 
-def save_settings(payday_day: int, inflow_type: str, expected_amount, currency="₹", db_path=DB_PATH):
+def save_settings(payday_day: int, inflow_type: str, expected_amount, currency="₹",
+                  use_custom_days: int = 0, custom_days_left: int = 30, db_path=DB_PATH):
     with _connection(db_path) as conn:
         conn.execute(
-            "UPDATE settings SET payday_day_of_month=?, inflow_type=?, expected_amount=?, currency=? WHERE id=1",
-            (payday_day, inflow_type, str(expected_amount), currency),
+            "UPDATE settings SET payday_day_of_month=?, inflow_type=?, expected_amount=?, currency=?, use_custom_days=?, custom_days_left=? WHERE id=1",
+            (payday_day, inflow_type, str(expected_amount), currency, int(use_custom_days), int(custom_days_left)),
         )
 
 
@@ -413,5 +424,5 @@ def clear_all_data(db_path=DB_PATH):
         conn.execute("DELETE FROM liabilities")
         conn.execute("DELETE FROM savings_transfers")
         conn.execute("DELETE FROM savings_goals")
-        conn.execute("UPDATE settings SET payday_day_of_month=1, inflow_type='SALARY', expected_amount='0', currency='₹' WHERE id=1")
+        conn.execute("UPDATE settings SET payday_day_of_month=1, inflow_type='SALARY', expected_amount='0', currency='₹', use_custom_days=0, custom_days_left=30 WHERE id=1")
         conn.execute("DELETE FROM sqlite_sequence")
