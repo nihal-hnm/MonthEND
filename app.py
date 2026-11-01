@@ -63,17 +63,10 @@ CURRENCY = settings.get("currency", "₹")
 PAYDAY = settings.get("payday_day_of_month", 1)
 INFLOW_TYPE = settings.get("inflow_type", "SALARY")
 EXPECTED_AMOUNT = fmoney(settings.get("expected_amount", 0))
-USE_CUSTOM_DAYS = bool(settings.get("use_custom_days", 0))
-CUSTOM_DAYS_LEFT = int(settings.get("custom_days_left", 30))
 
 # ─── Cycle Computation ───────────────────────────────────────────────────────
 
 cycle = get_current_cycle(PAYDAY)
-
-# Determine active days left for spending
-use_custom_days = bool(st.session_state.get("use_custom_days", USE_CUSTOM_DAYS))
-effective_days_remaining = int(st.session_state.get("active_days_left", CUSTOM_DAYS_LEFT)) if use_custom_days else cycle.days_remaining
-effective_total_days = max(effective_days_remaining, cycle.total_days if not use_custom_days else effective_days_remaining)
 
 # ─── Header & Theme Toggle ───────────────────────────────────────────────────
 
@@ -171,10 +164,7 @@ else:
     """, unsafe_allow_html=True)
 
 # Cycle status chip
-if use_custom_days:
-    chip_text = f"⏳ Custom Runway · {effective_days_remaining} days left for spending"
-else:
-    chip_text = cycle_status_text(cycle, INFLOW_TYPE)
+chip_text = cycle_status_text(cycle, INFLOW_TYPE)
 if is_light:
     chip_html = (
         f'<div style="background:#e0f2fe;color:#0369a1;padding:8px 16px;border-radius:8px;'
@@ -217,38 +207,8 @@ with st.sidebar:
             "Expected monthly income (₹)", min_value=0.0,
             value=float(EXPECTED_AMOUNT), step=500.0, format="%.0f",
         )
-
-        st.divider()
-        st.markdown("**⏱️ Spending Days & Runway Mode**")
-        switch_days_mode = st.toggle(
-            "Switch to custom days left for spending",
-            value=use_custom_days,
-            key="custom_days_switch",
-            help="Switch to a custom number of days left for spending instead of auto-calculating from the payday anchor",
-        )
-        st.session_state["use_custom_days"] = switch_days_mode
-
-        if switch_days_mode:
-            selected_days = st.slider(
-                "Days left for spending",
-                min_value=1,
-                max_value=90,
-                value=int(effective_days_remaining),
-                step=1,
-                key="custom_days_slider",
-                help="Slide to adjust the exact number of days your budget should last",
-            )
-            st.session_state["active_days_left"] = selected_days
-        else:
-            selected_days = cycle.days_remaining
-            st.caption(f"📅 Auto-paced from payday: **{cycle.days_remaining} days left** in current cycle")
-
         if st.button("Save Settings", key="save_settings"):
-            database.save_settings(
-                new_payday, new_inflow_type, new_expected,
-                use_custom_days=1 if switch_days_mode else 0,
-                custom_days_left=selected_days
-            )
+            database.save_settings(new_payday, new_inflow_type, new_expected)
             st.success("Settings saved!")
             st.rerun()
 
@@ -299,10 +259,10 @@ pending_emis = database.get_pending_emis_total(
 
 try:
     metrics = calculate_budget(
-        total, fixed, effective_total_days, reserve,
+        total, fixed, cycle.total_days, reserve,
         pending_emis=pending_emis,
         spent_this_cycle=spent_this_cycle,
-        days_remaining=effective_days_remaining,
+        days_remaining=cycle.days_remaining,
     )
 except (ValueError, InvalidOperation) as exc:
     st.error(str(exc))
@@ -317,7 +277,7 @@ m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("Available", format_inr(metrics.total_money))
 m2.metric("After Bills", format_inr(max(Decimal("0"), metrics.total_money - metrics.fixed_expenses)))
 m3.metric("True Disposable", format_inr(metrics.true_disposable), help="After bills, reserve & pending EMIs")
-m4.metric("Safe Daily Limit", format_inr(metrics.safe_daily_limit), f"{effective_days_remaining} days left")
+m4.metric("Safe Daily Limit", format_inr(metrics.safe_daily_limit), f"{cycle.days_remaining} days left")
 m5.metric("Spent This Cycle", format_inr(spent_this_cycle))
 
 if metrics.critical and metrics.usable_pool > 0:
@@ -338,7 +298,7 @@ with tab_dash:
     st.subheader("Cycle Overview")
 
     # Run-rate projection
-    projection = run_rate_projection(spent_this_cycle, cycle.day_index, effective_total_days)
+    projection = run_rate_projection(spent_this_cycle, cycle.day_index, cycle.total_days)
     proj_col1, proj_col2, proj_col3 = st.columns(3)
     proj_col1.metric("Daily Burn Rate", format_inr(projection["daily_rate"]))
     proj_col2.metric("Projected Total Spend", format_inr(projection["projected_total"]))
@@ -838,10 +798,7 @@ with tab_plan:
         with st.spinner("Analyzing your budget and preparing personalized guidance..."):
             try:
                 # Build extended context
-                if use_custom_days:
-                    cycle_ctx = f"Custom runway: {effective_days_remaining} days left for spending"
-                else:
-                    cycle_ctx = f"Day {cycle.day_index}/{cycle.total_days}, {cycle.days_remaining} days left"
+                cycle_ctx = f"Day {cycle.day_index}/{cycle.total_days}, {cycle.days_remaining} days left"
                 lia_ctx = f"Pending EMIs: {format_inr(pending_emis)}" if pending_emis > 0 else None
                 savings_ctx = f"Monthly savings needed: {format_inr(total_savings_needed)}" if total_savings_needed > 0 else None
                 impulse_ctx = None
