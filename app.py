@@ -54,12 +54,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Hide default Streamlit hamburger menu
-st.markdown("""
-<style>
-#MainMenu {visibility: hidden;}
-</style>
-""", unsafe_allow_html=True)
 database.init_db()
 
 # ─── Load Settings ────────────────────────────────────────────────────────────
@@ -74,19 +68,116 @@ EXPECTED_AMOUNT = fmoney(settings.get("expected_amount", 0))
 
 cycle = get_current_cycle(PAYDAY)
 
-# ─── Header ───────────────────────────────────────────────────────────────────
+# ─── Header & Theme Toggle ───────────────────────────────────────────────────
 
-st.title("📅 MonthEnd")
-st.caption("Beat the month-end crunch — track every ₹, pace your cycle, kill impulse spends.")
+if "theme" not in st.session_state:
+    st.session_state["theme"] = "dark"
+
+head_col, theme_col = st.columns([5, 1.3])
+with head_col:
+    st.title("📅 MonthEnd")
+    st.caption("Beat the month-end crunch — track every ₹, pace your cycle, kill impulse spends.")
+with theme_col:
+    st.write("")  # Vertical spacing alignment
+    is_light = st.toggle("☀️ Light Mode", value=(st.session_state["theme"] == "light"), key="theme_toggle")
+    st.session_state["theme"] = "light" if is_light else "dark"
+
+# ─── Dynamic Theme Styling ───────────────────────────────────────────────────
+
+if is_light:
+    st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    [data-testid="stAppViewContainer"] {
+        background-color: #f8fafc;
+        color: #0f172a;
+    }
+    [data-testid="stHeader"] {
+        background-color: rgba(248, 250, 252, 0.85);
+    }
+    [data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #e2e8f0;
+    }
+    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown {
+        color: #0f172a !important;
+    }
+    .stCaption, [data-testid="stCaptionContainer"] {
+        color: #64748b !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #0f172a !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #475569 !important;
+    }
+    [data-testid="metric-container"] {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 14px;
+        border-radius: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #e2e8f0;
+        border-radius: 8px;
+        padding: 4px;
+        gap: 4px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: #475569 !important;
+        border-radius: 6px;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #ffffff !important;
+        color: #0284c7 !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+    [data-testid="stExpander"] {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+    }
+    .streamlit-expanderHeader {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    [data-testid="metric-container"] {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        padding: 14px;
+        border-radius: 10px;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #94a3b8 !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #f8fafc !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # Cycle status chip
 chip_text = cycle_status_text(cycle, INFLOW_TYPE)
-st.markdown(
-    f'<div style="background:#1e293b;color:#38bdf8;padding:8px 16px;border-radius:8px;'
-    f'font-weight:600;display:inline-block;margin-bottom:8px;border:1px solid #334155;">'
-    f'📅 {chip_text}</div>',
-    unsafe_allow_html=True,
-)
+if is_light:
+    chip_html = (
+        f'<div style="background:#e0f2fe;color:#0369a1;padding:8px 16px;border-radius:8px;'
+        f'font-weight:600;display:inline-block;margin-bottom:8px;border:1px solid #bae6fd;">'
+        f'📅 {chip_text}</div>'
+    )
+else:
+    chip_html = (
+        f'<div style="background:#1e293b;color:#38bdf8;padding:8px 16px;border-radius:8px;'
+        f'font-weight:600;display:inline-block;margin-bottom:8px;border:1px solid #334155;">'
+        f'📅 {chip_text}</div>'
+    )
+st.markdown(chip_html, unsafe_allow_html=True)
 
 # Overdue inflow alert
 if check_inflow_overdue(PAYDAY, EXPECTED_AMOUNT):
@@ -224,13 +315,22 @@ with tab_dash:
 
     # Spending persona
     persona = classify_spending_persona(PAYDAY)
-    st.markdown(
-        f'<div style="background:#1e293b;padding:12px 20px;border-radius:10px;border:1px solid #334155;margin:8px 0;">'
-        f'<span style="font-size:1.5em">{persona["icon"]}</span> '
-        f'<strong style="color:#e2e8f0;font-size:1.1em">{persona["persona"]}</strong> '
-        f'<span style="color:#94a3b8"> — {persona["reason"]}</span></div>',
-        unsafe_allow_html=True,
-    )
+    if is_light:
+        persona_html = (
+            f'<div style="background:#ffffff;padding:12px 20px;border-radius:10px;border:1px solid #e2e8f0;'
+            f'box-shadow:0 1px 3px rgba(0,0,0,0.04);margin:8px 0;">'
+            f'<span style="font-size:1.5em">{persona["icon"]}</span> '
+            f'<strong style="color:#0f172a;font-size:1.1em">{persona["persona"]}</strong> '
+            f'<span style="color:#64748b"> — {persona["reason"]}</span></div>'
+        )
+    else:
+        persona_html = (
+            f'<div style="background:#1e293b;padding:12px 20px;border-radius:10px;border:1px solid #334155;margin:8px 0;">'
+            f'<span style="font-size:1.5em">{persona["icon"]}</span> '
+            f'<strong style="color:#e2e8f0;font-size:1.1em">{persona["persona"]}</strong> '
+            f'<span style="color:#94a3b8"> — {persona["reason"]}</span></div>'
+        )
+    st.markdown(persona_html, unsafe_allow_html=True)
 
     # Today's spending summary
     st.divider()
@@ -252,13 +352,21 @@ with tab_dash:
     if today_expenses:
         imp_summary = daily_impulse_summary(today_expenses, metrics.safe_daily_limit)
         if imp_summary["impulse_count"] > 0:
-            st.markdown(
-                f'<div style="background:#431407;padding:10px 16px;border-radius:8px;border:1px solid #92400e;color:#fbbf24;">'
-                f'⚡ {imp_summary["impulse_count"]} impulse spend(s) today '
-                f'({format_inr(imp_summary["impulse_total"])}) — '
-                f'{imp_summary["impulse_percentage"]}% of total</div>',
-                unsafe_allow_html=True,
-            )
+            if is_light:
+                impulse_html = (
+                    f'<div style="background:#fef3c7;padding:10px 16px;border-radius:8px;border:1px solid #fde68a;color:#92400e;">'
+                    f'⚡ {imp_summary["impulse_count"]} impulse spend(s) today '
+                    f'({format_inr(imp_summary["impulse_total"])}) — '
+                    f'{imp_summary["impulse_percentage"]}% of total</div>'
+                )
+            else:
+                impulse_html = (
+                    f'<div style="background:#431407;padding:10px 16px;border-radius:8px;border:1px solid #92400e;color:#fbbf24;">'
+                    f'⚡ {imp_summary["impulse_count"]} impulse spend(s) today '
+                    f'({format_inr(imp_summary["impulse_total"])}) — '
+                    f'{imp_summary["impulse_percentage"]}% of total</div>'
+                )
+            st.markdown(impulse_html, unsafe_allow_html=True)
 
     # EMI status
     st.divider()
@@ -282,14 +390,23 @@ with tab_dash:
 
 with tab_log:
     # Safe daily limit banner
-    st.markdown(
-        f'<div style="background:#0f172a;padding:12px 20px;border-radius:10px;border:1px solid #1e40af;'
-        f'text-align:center;margin-bottom:16px;">'
-        f'<span style="color:#60a5fa;font-size:0.85em;">SAFE DAILY LIMIT</span><br>'
-        f'<span style="color:#f1f5f9;font-size:1.8em;font-weight:700;">{format_inr(metrics.safe_daily_limit)}</span>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    if is_light:
+        safe_banner_html = (
+            f'<div style="background:#eff6ff;padding:12px 20px;border-radius:10px;border:1px solid #bfdbfe;'
+            f'text-align:center;margin-bottom:16px;box-shadow:0 1px 3px rgba(37,99,235,0.06);">'
+            f'<span style="color:#2563eb;font-size:0.85em;font-weight:600;">SAFE DAILY LIMIT</span><br>'
+            f'<span style="color:#1e3a8a;font-size:1.8em;font-weight:700;">{format_inr(metrics.safe_daily_limit)}</span>'
+            f'</div>'
+        )
+    else:
+        safe_banner_html = (
+            f'<div style="background:#0f172a;padding:12px 20px;border-radius:10px;border:1px solid #1e40af;'
+            f'text-align:center;margin-bottom:16px;">'
+            f'<span style="color:#60a5fa;font-size:0.85em;">SAFE DAILY LIMIT</span><br>'
+            f'<span style="color:#f1f5f9;font-size:1.8em;font-weight:700;">{format_inr(metrics.safe_daily_limit)}</span>'
+            f'</div>'
+        )
+    st.markdown(safe_banner_html, unsafe_allow_html=True)
 
     with st.form("quick_expense_form", clear_on_submit=True):
         qc1, qc2 = st.columns(2)
