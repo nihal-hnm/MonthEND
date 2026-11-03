@@ -23,6 +23,30 @@ _supabase_client = None
 _last_config_signature: Optional[str] = None
 
 
+# ─── Type-Safe PostgREST Response Helpers ─────────────────────────────────────
+
+def _as_list_dicts(data: Any) -> list[dict[str, Any]]:
+    """Safely convert PostgREST response data to list of dicts."""
+    if not isinstance(data, list):
+        return []
+    return [dict(item) for item in data if isinstance(item, dict)]
+
+
+def _extract_id(res: Any) -> int:
+    """Extract integer primary key ID from an APIResponse object."""
+    data = getattr(res, "data", None)
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        val = data[0].get("id")
+        if val is not None:
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                pass
+    return 0
+
+
+# ─── Configuration ────────────────────────────────────────────────────────────
+
 def _load_env_file() -> dict[str, str]:
     """Parse key=value pairs from .env without requiring external dependencies."""
     env_vars: dict[str, str] = {}
@@ -132,7 +156,7 @@ def is_configured() -> bool:
     return bool(cfg["url"] and cfg["key"])
 
 
-def get_client():
+def get_client() -> Any:
     """Retrieve or initialize the active Supabase client."""
     global _supabase_client, _last_config_signature
     cfg = get_config()
@@ -144,7 +168,7 @@ def get_client():
     if not cfg["url"] or not cfg["key"]:
         return None
 
-    from supabase import create_client, Client  # type: ignore
+    from supabase import create_client  # type: ignore
 
     _supabase_client = create_client(cfg["url"], cfg["key"])
     _last_config_signature = sig
@@ -176,7 +200,7 @@ def test_connection() -> tuple[bool, str, dict[str, Any]]:
     except Exception as exc:
         err_msg = str(exc)
         if "relation \"public.settings\" does not exist" in err_msg or "PGRST204" in err_msg or "PGRST205" in err_msg or "Could not find the table" in err_msg or "404" in err_msg:
-            return False, "Connected to Supabase, but tables are missing. Please execute 'supabase_schema.sql' in the Supabase SQL Editor.", {
+            return False, "Connected to Supabase, but database tables are missing. Please execute 'supabase_schema.sql' in the Supabase SQL Editor.", {
                 "configured": True,
                 "schema_missing": True,
                 "error": err_msg,
@@ -189,9 +213,9 @@ def test_connection() -> tuple[bool, str, dict[str, Any]]:
 
 # ─── Settings ─────────────────────────────────────────────────────────────────
 
-def get_settings() -> dict:
+def get_settings() -> dict[str, Any]:
     client = get_client()
-    default_settings = {
+    default_settings: dict[str, Any] = {
         "id": 1,
         "payday_day_of_month": 1,
         "inflow_type": "SALARY",
@@ -205,8 +229,9 @@ def get_settings() -> dict:
 
     try:
         res = client.table("settings").select("*").eq("id", 1).execute()
-        if res.data:
-            d = dict(res.data[0])
+        rows = _as_list_dicts(res.data)
+        if rows:
+            d = dict(rows[0])
             if "use_custom_days" not in d:
                 d["use_custom_days"] = 0
             if "custom_days_left" not in d:
@@ -215,17 +240,17 @@ def get_settings() -> dict:
         # Seed row if missing
         client.table("settings").insert(default_settings).execute()
         return default_settings
-    except Exception:
-        return default_settings
+    except Exception as exc:
+        raise RuntimeError(f"Supabase settings query failed: {exc}")
 
 
-def save_settings(payday_day: int, inflow_type: str, expected_amount, currency="₹",
-                  use_custom_days: int = 0, custom_days_left: int = 30):
+def save_settings(payday_day: int, inflow_type: str, expected_amount: Any, currency: str = "₹",
+                  use_custom_days: int = 0, custom_days_left: int = 30) -> None:
     client = get_client()
     if client is None:
         return
 
-    payload = {
+    payload: dict[str, Any] = {
         "id": 1,
         "payday_day_of_month": int(payday_day),
         "inflow_type": str(inflow_type),
@@ -240,12 +265,12 @@ def save_settings(payday_day: int, inflow_type: str, expected_amount, currency="
 
 # ─── Plans ────────────────────────────────────────────────────────────────────
 
-def save_plan(name, metrics, advice_json: str) -> int:
+def save_plan(name: str, metrics: Any, advice_json: str) -> int:
     client = get_client()
     if client is None:
         return 0
 
-    payload = {
+    payload: dict[str, Any] = {
         "name": (name or "").strip() or "Survival plan",
         "total_money": str(metrics.total_money),
         "fixed_expenses": str(metrics.fixed_expenses),
@@ -255,20 +280,18 @@ def save_plan(name, metrics, advice_json: str) -> int:
         "advice_json": advice_json,
     }
     res = client.table("plans").insert(payload).execute()
-    if res.data and len(res.data) > 0:
-        return int(res.data[0]["id"])
-    return 0
+    return _extract_id(res)
 
 
-def list_plans() -> list[dict]:
+def list_plans() -> list[dict[str, Any]]:
     client = get_client()
     if client is None:
         return []
     res = client.table("plans").select("*").order("created_at", desc=True).order("id", desc=True).execute()
-    return res.data or []
+    return _as_list_dicts(res.data)
 
 
-def delete_plan(plan_id: int):
+def delete_plan(plan_id: int) -> None:
     client = get_client()
     if client is None:
         return
@@ -277,8 +300,8 @@ def delete_plan(plan_id: int):
 
 # ─── Expenses ─────────────────────────────────────────────────────────────────
 
-def add_expense(plan_id, amount, category, note="", spent_on=None,
-                payment_mode="UPI", is_planned=True, hour_logged=None) -> int:
+def add_expense(plan_id: Any, amount: Any, category: str, note: str = "", spent_on: Optional[str] = None,
+                payment_mode: str = "UPI", is_planned: bool = True, hour_logged: Optional[int] = None) -> int:
     client = get_client()
     if client is None:
         return 0
@@ -286,7 +309,7 @@ def add_expense(plan_id, amount, category, note="", spent_on=None,
     if hour_logged is None:
         hour_logged = datetime.now().hour
 
-    payload = {
+    payload: dict[str, Any] = {
         "plan_id": int(plan_id) if plan_id is not None else None,
         "spent_on": spent_on or date.today().isoformat(),
         "amount": str(amount),
@@ -297,12 +320,10 @@ def add_expense(plan_id, amount, category, note="", spent_on=None,
         "hour_logged": int(hour_logged),
     }
     res = client.table("expenses").insert(payload).execute()
-    if res.data and len(res.data) > 0:
-        return int(res.data[0]["id"])
-    return 0
+    return _extract_id(res)
 
 
-def list_expenses(plan_id=None, spent_on=None) -> list[dict]:
+def list_expenses(plan_id: Optional[int] = None, spent_on: Optional[str] = None) -> list[dict[str, Any]]:
     client = get_client()
     if client is None:
         return []
@@ -314,10 +335,10 @@ def list_expenses(plan_id=None, spent_on=None) -> list[dict]:
         query = query.eq("spent_on", str(spent_on))
 
     res = query.order("spent_on", desc=True).order("id", desc=True).execute()
-    return res.data or []
+    return _as_list_dicts(res.data)
 
 
-def list_expenses_range(start_date: str, end_date: str) -> list[dict]:
+def list_expenses_range(start_date: str, end_date: str) -> list[dict[str, Any]]:
     client = get_client()
     if client is None:
         return []
@@ -327,10 +348,10 @@ def list_expenses_range(start_date: str, end_date: str) -> list[dict]:
         .order("spent_on", desc=True)\
         .order("id", desc=True)\
         .execute()
-    return res.data or []
+    return _as_list_dicts(res.data)
 
 
-def delete_expense(expense_id: int):
+def delete_expense(expense_id: int) -> None:
     client = get_client()
     if client is None:
         return
@@ -346,18 +367,18 @@ def get_total_spent_in_range(start_date: str, end_date: str) -> Decimal:
         .gte("spent_on", start_date)\
         .lte("spent_on", end_date)\
         .execute()
-    rows = res.data or []
-    return sum((Decimal(str(r["amount"])) for r in rows), Decimal("0.00"))
+    rows = _as_list_dicts(res.data)
+    return sum((Decimal(str(r.get("amount", "0"))) for r in rows), Decimal("0.00"))
 
 
 # ─── Inflows ──────────────────────────────────────────────────────────────────
 
-def add_inflow(amount, inflow_type, inflow_date, cycle_start=None, cycle_end=None, note="") -> int:
+def add_inflow(amount: Any, inflow_type: str, inflow_date: str, cycle_start: Optional[str] = None, cycle_end: Optional[str] = None, note: str = "") -> int:
     client = get_client()
     if client is None:
         return 0
 
-    payload = {
+    payload: dict[str, Any] = {
         "amount": str(amount),
         "type": str(inflow_type),
         "date": str(inflow_date),
@@ -366,12 +387,10 @@ def add_inflow(amount, inflow_type, inflow_date, cycle_start=None, cycle_end=Non
         "note": (note or "").strip(),
     }
     res = client.table("inflows").insert(payload).execute()
-    if res.data and len(res.data) > 0:
-        return int(res.data[0]["id"])
-    return 0
+    return _extract_id(res)
 
 
-def list_inflows(limit=50) -> list[dict]:
+def list_inflows(limit: int = 50) -> list[dict[str, Any]]:
     client = get_client()
     if client is None:
         return []
@@ -380,10 +399,10 @@ def list_inflows(limit=50) -> list[dict]:
         .order("id", desc=True)\
         .limit(int(limit))\
         .execute()
-    return res.data or []
+    return _as_list_dicts(res.data)
 
 
-def get_inflows_in_range(start_date: str, end_date: str) -> list[dict]:
+def get_inflows_in_range(start_date: str, end_date: str) -> list[dict[str, Any]]:
     client = get_client()
     if client is None:
         return []
@@ -392,18 +411,18 @@ def get_inflows_in_range(start_date: str, end_date: str) -> list[dict]:
         .lte("date", end_date)\
         .order("date", desc=True)\
         .execute()
-    return res.data or []
+    return _as_list_dicts(res.data)
 
 
 # ─── Liabilities ──────────────────────────────────────────────────────────────
 
-def add_liability(name, liability_type, emi_amount, principal=0, interest_rate=0.0,
-                  tenure_remaining=1, due_day=1, note="") -> int:
+def add_liability(name: str, liability_type: str, emi_amount: Any, principal: Any = 0, interest_rate: float = 0.0,
+                  tenure_remaining: int = 1, due_day: int = 1, note: str = "") -> int:
     client = get_client()
     if client is None:
         return 0
 
-    payload = {
+    payload: dict[str, Any] = {
         "name": str(name),
         "type": str(liability_type),
         "principal": str(principal),
@@ -415,12 +434,10 @@ def add_liability(name, liability_type, emi_amount, principal=0, interest_rate=0
         "note": (note or "").strip(),
     }
     res = client.table("liabilities").insert(payload).execute()
-    if res.data and len(res.data) > 0:
-        return int(res.data[0]["id"])
-    return 0
+    return _extract_id(res)
 
 
-def list_liabilities(status="ACTIVE") -> list[dict]:
+def list_liabilities(status: Optional[str] = "ACTIVE") -> list[dict[str, Any]]:
     client = get_client()
     if client is None:
         return []
@@ -429,31 +446,32 @@ def list_liabilities(status="ACTIVE") -> list[dict]:
     if status:
         query = query.eq("status", str(status))
     res = query.order("due_day").order("id").execute()
-    return res.data or []
+    return _as_list_dicts(res.data)
 
 
-def update_liability_status(liability_id: int, status: str):
+def update_liability_status(liability_id: int, status: str) -> None:
     client = get_client()
     if client is None:
         return
     client.table("liabilities").update({"status": str(status)}).eq("id", int(liability_id)).execute()
 
 
-def delete_liability(liability_id: int):
+def delete_liability(liability_id: int) -> None:
     client = get_client()
     if client is None:
         return
     client.table("liabilities").delete().eq("id", int(liability_id)).execute()
 
 
-def decrement_tenure(liability_id: int):
+def decrement_tenure(liability_id: int) -> None:
     client = get_client()
     if client is None:
         return
 
     res = client.table("liabilities").select("tenure_remaining").eq("id", int(liability_id)).execute()
-    if res.data:
-        cur_tenure = int(res.data[0].get("tenure_remaining", 1))
+    rows = _as_list_dicts(res.data)
+    if rows:
+        cur_tenure = int(rows[0].get("tenure_remaining", 1))
         new_tenure = max(0, cur_tenure - 1)
         up_data: dict[str, Any] = {"tenure_remaining": new_tenure}
         if new_tenure <= 0:
@@ -463,7 +481,7 @@ def decrement_tenure(liability_id: int):
 
 # ─── Liability Payments ──────────────────────────────────────────────────────
 
-def add_liability_payment(liability_id: int, amount, paid_date=None) -> int:
+def add_liability_payment(liability_id: int, amount: Any, paid_date: Optional[str] = None) -> int:
     client = get_client()
     if client is None:
         return 0
@@ -471,18 +489,16 @@ def add_liability_payment(liability_id: int, amount, paid_date=None) -> int:
     if paid_date is None:
         paid_date = date.today().isoformat()
 
-    payload = {
+    payload: dict[str, Any] = {
         "liability_id": int(liability_id),
         "paid_date": str(paid_date),
         "amount": str(amount),
     }
     res = client.table("liability_payments").insert(payload).execute()
-    if res.data and len(res.data) > 0:
-        return int(res.data[0]["id"])
-    return 0
+    return _extract_id(res)
 
 
-def list_liability_payments(liability_id=None) -> list[dict]:
+def list_liability_payments(liability_id: Optional[int] = None) -> list[dict[str, Any]]:
     client = get_client()
     if client is None:
         return []
@@ -491,7 +507,7 @@ def list_liability_payments(liability_id=None) -> list[dict]:
     if liability_id is not None:
         query = query.eq("liability_id", int(liability_id))
     res = query.order("paid_date", desc=True).execute()
-    return res.data or []
+    return _as_list_dicts(res.data)
 
 
 def get_pending_emis_total(cycle_start: str, cycle_end: str) -> Decimal:
@@ -500,27 +516,27 @@ def get_pending_emis_total(cycle_start: str, cycle_end: str) -> Decimal:
         return Decimal("0.00")
 
     res = client.table("liabilities").select("id, emi_amount, due_day").eq("status", "ACTIVE").execute()
-    liabilities = res.data or []
+    liabilities = _as_list_dicts(res.data)
     total = Decimal("0.00")
     for lia in liabilities:
         paid_res = client.table("liability_payments").select("id")\
-            .eq("liability_id", lia["id"])\
+            .eq("liability_id", lia.get("id"))\
             .gte("paid_date", cycle_start)\
             .lte("paid_date", cycle_end)\
             .execute()
-        if not (paid_res.data or []):
-            total += Decimal(str(lia["emi_amount"]))
+        if not _as_list_dicts(paid_res.data):
+            total += Decimal(str(lia.get("emi_amount", "0")))
     return total
 
 
 # ─── Savings Goals ────────────────────────────────────────────────────────────
 
-def add_savings_goal(name: str, target_amount, deadline=None, priority=1) -> int:
+def add_savings_goal(name: str, target_amount: Any, deadline: Optional[str] = None, priority: int = 1) -> int:
     client = get_client()
     if client is None:
         return 0
 
-    payload = {
+    payload: dict[str, Any] = {
         "name": str(name),
         "target_amount": str(target_amount),
         "deadline": deadline,
@@ -529,12 +545,10 @@ def add_savings_goal(name: str, target_amount, deadline=None, priority=1) -> int
         "status": "ACTIVE",
     }
     res = client.table("savings_goals").insert(payload).execute()
-    if res.data and len(res.data) > 0:
-        return int(res.data[0]["id"])
-    return 0
+    return _extract_id(res)
 
 
-def list_savings_goals(status="ACTIVE") -> list[dict]:
+def list_savings_goals(status: Optional[str] = "ACTIVE") -> list[dict[str, Any]]:
     client = get_client()
     if client is None:
         return []
@@ -543,24 +557,24 @@ def list_savings_goals(status="ACTIVE") -> list[dict]:
     if status:
         query = query.eq("status", str(status))
     res = query.order("priority").order("id").execute()
-    return res.data or []
+    return _as_list_dicts(res.data)
 
 
-def update_savings_goal_amount(goal_id: int, new_amount):
+def update_savings_goal_amount(goal_id: int, new_amount: Any) -> None:
     client = get_client()
     if client is None:
         return
     client.table("savings_goals").update({"current_amount": str(new_amount)}).eq("id", int(goal_id)).execute()
 
 
-def update_savings_goal_status(goal_id: int, status: str):
+def update_savings_goal_status(goal_id: int, status: str) -> None:
     client = get_client()
     if client is None:
         return
     client.table("savings_goals").update({"status": str(status)}).eq("id", int(goal_id)).execute()
 
 
-def delete_savings_goal(goal_id: int):
+def delete_savings_goal(goal_id: int) -> None:
     client = get_client()
     if client is None:
         return
@@ -569,7 +583,7 @@ def delete_savings_goal(goal_id: int):
 
 # ─── Savings Transfers ───────────────────────────────────────────────────────
 
-def add_savings_transfer(goal_id: int, amount, transfer_date=None) -> int:
+def add_savings_transfer(goal_id: int, amount: Any, transfer_date: Optional[str] = None) -> int:
     client = get_client()
     if client is None:
         return 0
@@ -577,21 +591,22 @@ def add_savings_transfer(goal_id: int, amount, transfer_date=None) -> int:
     if transfer_date is None:
         transfer_date = date.today().isoformat()
 
-    payload = {
+    payload: dict[str, Any] = {
         "goal_id": int(goal_id),
         "amount": str(amount),
         "date": str(transfer_date),
     }
     res = client.table("savings_transfers").insert(payload).execute()
-    new_id = int(res.data[0]["id"]) if (res.data and len(res.data) > 0) else 0
+    new_id = _extract_id(res)
 
     # Increment goal current_amount
     goal_res = client.table("savings_goals").select("current_amount, target_amount").eq("id", int(goal_id)).execute()
-    if goal_res.data:
-        g = goal_res.data[0]
+    g_rows = _as_list_dicts(goal_res.data)
+    if g_rows:
+        g = g_rows[0]
         cur_amt = Decimal(str(g.get("current_amount", "0"))) + Decimal(str(amount))
         target_amt = Decimal(str(g.get("target_amount", "0")))
-        up_data = {"current_amount": str(cur_amt)}
+        up_data: dict[str, Any] = {"current_amount": str(cur_amt)}
         if cur_amt >= target_amt:
             up_data["status"] = "REACHED"
         client.table("savings_goals").update(up_data).eq("id", int(goal_id)).execute()
@@ -599,7 +614,7 @@ def add_savings_transfer(goal_id: int, amount, transfer_date=None) -> int:
     return new_id
 
 
-def list_savings_transfers(goal_id=None) -> list[dict]:
+def list_savings_transfers(goal_id: Optional[int] = None) -> list[dict[str, Any]]:
     client = get_client()
     if client is None:
         return []
@@ -608,12 +623,12 @@ def list_savings_transfers(goal_id=None) -> list[dict]:
     if goal_id is not None:
         query = query.eq("goal_id", int(goal_id))
     res = query.order("date", desc=True).execute()
-    return res.data or []
+    return _as_list_dicts(res.data)
 
 
 # ─── Data Reset ──────────────────────────────────────────────────────────────
 
-def clear_all_data():
+def clear_all_data() -> None:
     """Wipe all user records in Supabase and reset settings to clean defaults."""
     client = get_client()
     if client is None:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+import time
 from contextlib import contextmanager
 from datetime import date, datetime
 from decimal import Decimal
@@ -25,8 +26,13 @@ DB_PATH = Path(__file__).with_name("survival_budget.db")
 
 # ─── Backend Selection ────────────────────────────────────────────────────────
 
+_supabase_verified: Optional[bool] = None
+_last_check_time: float = 0.0
+
+
 def is_supabase_active(db_path=DB_PATH) -> bool:
     """Determine whether calls should be routed to Supabase Cloud."""
+    global _supabase_verified, _last_check_time
     if db_path != DB_PATH:
         return False
     cfg = supabase_backend.get_config()
@@ -37,8 +43,14 @@ def is_supabase_active(db_path=DB_PATH) -> bool:
         return False
     if mode == "supabase":
         return True
-    # In 'auto' mode, prefer Supabase if configured
-    return True
+
+    # In 'auto' mode, route to Supabase only if connection & schema are verified
+    now = time.time()
+    if _supabase_verified is None or (now - _last_check_time) > 15.0:
+        ok, _, details = supabase_backend.test_connection()
+        _supabase_verified = ok and not details.get("schema_missing", False)
+        _last_check_time = now
+    return bool(_supabase_verified)
 
 
 def get_backend_info() -> dict[str, Any]:
