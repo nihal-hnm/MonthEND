@@ -1,15 +1,92 @@
-"""Local SQLite storage for the Survival Budget app.
+"""Unified Database Layer for MonthEnd Sovereign FinTech.
 
-Tables: plans, expenses (original) + settings, inflows, liabilities,
-liability_payments, savings_goals, savings_transfers (new).
+Supports dual backends:
+1. Supabase Cloud (PostgreSQL via PostgREST / supabase-py)
+2. Local SQLite (survival_budget.db - air-gapped fallback)
+
+Caller interfaces are 100% backward-compatible.
 """
+from __future__ import annotations
+
+import logging
 import sqlite3
 from contextlib import contextmanager
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
+from typing import Any, Optional
+
+import supabase_backend
+
+logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).with_name("survival_budget.db")
 
+
+# ─── Backend Selection ────────────────────────────────────────────────────────
+
+def is_supabase_active(db_path=DB_PATH) -> bool:
+    """Determine whether calls should be routed to Supabase Cloud."""
+    if db_path != DB_PATH:
+        return False
+    cfg = supabase_backend.get_config()
+    mode = cfg.get("mode", "auto").lower()
+    if mode == "sqlite":
+        return False
+    if not supabase_backend.is_configured():
+        return False
+    if mode == "supabase":
+        return True
+    # In 'auto' mode, prefer Supabase if configured
+    return True
+
+
+def get_backend_info() -> dict[str, Any]:
+    """Retrieve detailed diagnostic metadata about the active backend."""
+    cfg = supabase_backend.get_config()
+    configured = supabase_backend.is_configured()
+    mode = cfg.get("mode", "auto").lower()
+    connected = False
+    message = "Using local SQLite database."
+    schema_missing = False
+
+    if configured:
+        ok, msg, details = supabase_backend.test_connection()
+        connected = ok
+        message = msg
+        schema_missing = details.get("schema_missing", False)
+
+    if mode == "sqlite":
+        active = "sqlite"
+    elif mode == "supabase":
+        active = "supabase" if connected else "sqlite_fallback"
+    else:  # auto
+        active = "supabase" if connected else "sqlite"
+
+    return {
+        "active_backend": active,
+        "mode": mode,
+        "configured": configured,
+        "connected": connected,
+        "message": message,
+        "schema_missing": schema_missing,
+        "url": cfg.get("url", ""),
+        "sqlite_path": str(DB_PATH),
+    }
+
+
+def set_backend_mode(mode: str):
+    """Set backend mode preference ('auto', 'supabase', 'sqlite')."""
+    cfg = supabase_backend.get_config()
+    supabase_backend.save_config(cfg.get("url", ""), cfg.get("key", ""), mode=mode)
+
+
+def sync_sqlite_to_supabase() -> dict[str, int]:
+    """Migrate all data from local SQLite into Supabase."""
+    return supabase_backend.sync_sqlite_to_supabase(DB_PATH)
+
+
+# ─── Local SQLite Connection ──────────────────────────────────────────────────
 
 @contextmanager
 def _connection(db_path=DB_PATH):
@@ -23,12 +100,18 @@ def _connection(db_path=DB_PATH):
         conn.close()
 
 
-# ─── Schema ──────────────────────────────────────────────────────────────────
+def _add_column_if_missing(conn, table, column, typedef):
+    cols = [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {typedef}")
+
+
+# ─── Schema Initialization ───────────────────────────────────────────────────
 
 def init_db(db_path=DB_PATH):
+    """Initialize local SQLite schema and check Supabase readiness if configured."""
     with _connection(db_path) as conn:
         conn.executescript("""
-        -- Original tables
         CREATE TABLE IF NOT EXISTS plans (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -51,7 +134,6 @@ def init_db(db_path=DB_PATH):
         );
         CREATE INDEX IF NOT EXISTS expenses_plan_date ON expenses(plan_id, spent_on);
 
-        -- User settings (single-row)
         CREATE TABLE IF NOT EXISTS settings (
             id INTEGER PRIMARY KEY CHECK (id = 1),
             payday_day_of_month INTEGER NOT NULL DEFAULT 1,
@@ -61,7 +143,6 @@ def init_db(db_path=DB_PATH):
         );
         INSERT OR IGNORE INTO settings(id) VALUES(1);
 
-        -- Inflow log
         CREATE TABLE IF NOT EXISTS inflows (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             amount TEXT NOT NULL,
@@ -73,7 +154,6 @@ def init_db(db_path=DB_PATH):
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Liabilities (EMI, BNPL, loans)
         CREATE TABLE IF NOT EXISTS liabilities (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -88,7 +168,6 @@ def init_db(db_path=DB_PATH):
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Liability payment log
         CREATE TABLE IF NOT EXISTS liability_payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             liability_id INTEGER NOT NULL REFERENCES liabilities(id) ON DELETE CASCADE,
@@ -97,7 +176,6 @@ def init_db(db_path=DB_PATH):
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Savings / wishlist goals
         CREATE TABLE IF NOT EXISTS savings_goals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -109,7 +187,6 @@ def init_db(db_path=DB_PATH):
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Savings transfers
         CREATE TABLE IF NOT EXISTS savings_transfers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             goal_id INTEGER NOT NULL REFERENCES savings_goals(id) ON DELETE CASCADE,
@@ -119,7 +196,6 @@ def init_db(db_path=DB_PATH):
         );
         """)
 
-        # Migrate existing expenses table: add new columns safely
         _add_column_if_missing(conn, "expenses", "payment_mode", "TEXT NOT NULL DEFAULT 'UPI'")
         _add_column_if_missing(conn, "expenses", "is_planned", "INTEGER NOT NULL DEFAULT 1")
         _add_column_if_missing(conn, "expenses", "hour_logged", "INTEGER NOT NULL DEFAULT 12")
@@ -127,16 +203,9 @@ def init_db(db_path=DB_PATH):
         _add_column_if_missing(conn, "settings", "custom_days_left", "INTEGER NOT NULL DEFAULT 30")
 
 
-def _add_column_if_missing(conn, table, column, typedef):
-    """Safely add a column if it doesn't already exist."""
-    cols = [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
-    if column not in cols:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {typedef}")
-
-
 # ─── Settings ─────────────────────────────────────────────────────────────────
 
-def get_settings(db_path=DB_PATH) -> dict:
+def _sqlite_get_settings(db_path=DB_PATH) -> dict:
     with _connection(db_path) as conn:
         row = conn.execute("SELECT * FROM settings WHERE id=1").fetchone()
         if row:
@@ -153,8 +222,17 @@ def get_settings(db_path=DB_PATH) -> dict:
         }
 
 
-def save_settings(payday_day: int, inflow_type: str, expected_amount, currency="₹",
-                  use_custom_days: int = 0, custom_days_left: int = 30, db_path=DB_PATH):
+def get_settings(db_path=DB_PATH) -> dict:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.get_settings()
+        except Exception as e:
+            logger.warning("Supabase get_settings failed, falling back to SQLite: %s", e)
+    return _sqlite_get_settings(db_path)
+
+
+def _sqlite_save_settings(payday_day: int, inflow_type: str, expected_amount, currency="₹",
+                          use_custom_days: int = 0, custom_days_left: int = 30, db_path=DB_PATH):
     with _connection(db_path) as conn:
         conn.execute(
             "UPDATE settings SET payday_day_of_month=?, inflow_type=?, expected_amount=?, currency=?, use_custom_days=?, custom_days_left=? WHERE id=1",
@@ -162,9 +240,20 @@ def save_settings(payday_day: int, inflow_type: str, expected_amount, currency="
         )
 
 
-# ─── Plans (original) ────────────────────────────────────────────────────────
+def save_settings(payday_day: int, inflow_type: str, expected_amount, currency="₹",
+                  use_custom_days: int = 0, custom_days_left: int = 30, db_path=DB_PATH):
+    # Always persist locally for offline resilience
+    _sqlite_save_settings(payday_day, inflow_type, expected_amount, currency, use_custom_days, custom_days_left, db_path)
+    if is_supabase_active(db_path):
+        try:
+            supabase_backend.save_settings(payday_day, inflow_type, expected_amount, currency, use_custom_days, custom_days_left)
+        except Exception as e:
+            logger.warning("Supabase save_settings failed: %s", e)
 
-def save_plan(name, metrics, advice_json, db_path=DB_PATH):
+
+# ─── Plans ────────────────────────────────────────────────────────────────────
+
+def _sqlite_save_plan(name, metrics, advice_json, db_path=DB_PATH) -> int:
     with _connection(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO plans(name,total_money,fixed_expenses,reserve,days,daily_allowance,advice_json) VALUES(?,?,?,?,?,?,?)",
@@ -172,10 +261,26 @@ def save_plan(name, metrics, advice_json, db_path=DB_PATH):
              str(metrics.fixed_expenses), str(metrics.emergency_reserve),
              metrics.days, str(metrics.daily_allowance), advice_json),
         )
-        return cur.lastrowid
+        return int(cur.lastrowid or 0)
 
 
-def list_plans(db_path=DB_PATH):
+def save_plan(name, metrics, advice_json, db_path=DB_PATH) -> int:
+    local_id = _sqlite_save_plan(name, metrics, advice_json, db_path)
+    if is_supabase_active(db_path):
+        try:
+            cloud_id = supabase_backend.save_plan(name, metrics, advice_json)
+            return cloud_id or local_id
+        except Exception as e:
+            logger.warning("Supabase save_plan failed: %s", e)
+    return local_id
+
+
+def list_plans(db_path=DB_PATH) -> list[dict]:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.list_plans()
+        except Exception as e:
+            logger.warning("Supabase list_plans failed, falling back to SQLite: %s", e)
     with _connection(db_path) as conn:
         return [dict(row) for row in conn.execute("SELECT * FROM plans ORDER BY created_at DESC, id DESC")]
 
@@ -183,12 +288,17 @@ def list_plans(db_path=DB_PATH):
 def delete_plan(plan_id, db_path=DB_PATH):
     with _connection(db_path) as conn:
         conn.execute("DELETE FROM plans WHERE id=?", (int(plan_id),))
+    if is_supabase_active(db_path):
+        try:
+            supabase_backend.delete_plan(plan_id)
+        except Exception as e:
+            logger.warning("Supabase delete_plan failed: %s", e)
 
 
-# ─── Expenses (extended) ─────────────────────────────────────────────────────
+# ─── Expenses ─────────────────────────────────────────────────────────────────
 
-def add_expense(plan_id, amount, category, note="", spent_on=None,
-                payment_mode="UPI", is_planned=True, hour_logged=None, db_path=DB_PATH):
+def _sqlite_add_expense(plan_id, amount, category, note="", spent_on=None,
+                        payment_mode="UPI", is_planned=True, hour_logged=None, db_path=DB_PATH) -> int:
     if hour_logged is None:
         hour_logged = datetime.now().hour
     with _connection(db_path) as conn:
@@ -197,10 +307,27 @@ def add_expense(plan_id, amount, category, note="", spent_on=None,
             (plan_id, (spent_on or date.today().isoformat()), str(amount),
              category, (note or "").strip(), payment_mode, int(is_planned), hour_logged),
         )
-        return cur.lastrowid
+        return int(cur.lastrowid or 0)
 
 
-def list_expenses(plan_id=None, spent_on=None, db_path=DB_PATH):
+def add_expense(plan_id, amount, category, note="", spent_on=None,
+                payment_mode="UPI", is_planned=True, hour_logged=None, db_path=DB_PATH) -> int:
+    local_id = _sqlite_add_expense(plan_id, amount, category, note, spent_on, payment_mode, is_planned, hour_logged, db_path)
+    if is_supabase_active(db_path):
+        try:
+            cloud_id = supabase_backend.add_expense(plan_id, amount, category, note, spent_on, payment_mode, is_planned, hour_logged)
+            return cloud_id or local_id
+        except Exception as e:
+            logger.warning("Supabase add_expense failed: %s", e)
+    return local_id
+
+
+def list_expenses(plan_id=None, spent_on=None, db_path=DB_PATH) -> list[dict]:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.list_expenses(plan_id, spent_on)
+        except Exception as e:
+            logger.warning("Supabase list_expenses failed, falling back to SQLite: %s", e)
     clauses, values = [], []
     if plan_id is not None:
         clauses.append("plan_id=?"); values.append(int(plan_id))
@@ -212,7 +339,11 @@ def list_expenses(plan_id=None, spent_on=None, db_path=DB_PATH):
 
 
 def list_expenses_range(start_date: str, end_date: str, db_path=DB_PATH) -> list[dict]:
-    """Get all expenses between start_date and end_date inclusive."""
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.list_expenses_range(start_date, end_date)
+        except Exception as e:
+            logger.warning("Supabase list_expenses_range failed, falling back to SQLite: %s", e)
     with _connection(db_path) as conn:
         return [dict(row) for row in conn.execute(
             "SELECT * FROM expenses WHERE spent_on >= ? AND spent_on <= ? ORDER BY spent_on DESC, id DESC",
@@ -223,11 +354,19 @@ def list_expenses_range(start_date: str, end_date: str, db_path=DB_PATH) -> list
 def delete_expense(expense_id, db_path=DB_PATH):
     with _connection(db_path) as conn:
         conn.execute("DELETE FROM expenses WHERE id=?", (int(expense_id),))
+    if is_supabase_active(db_path):
+        try:
+            supabase_backend.delete_expense(expense_id)
+        except Exception as e:
+            logger.warning("Supabase delete_expense failed: %s", e)
 
 
-def get_total_spent_in_range(start_date: str, end_date: str, db_path=DB_PATH):
-    """Sum of expenses in a date range."""
-    from decimal import Decimal
+def get_total_spent_in_range(start_date: str, end_date: str, db_path=DB_PATH) -> Decimal:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.get_total_spent_in_range(start_date, end_date)
+        except Exception as e:
+            logger.warning("Supabase get_total_spent_in_range failed, falling back to SQLite: %s", e)
     with _connection(db_path) as conn:
         rows = conn.execute(
             "SELECT amount FROM expenses WHERE spent_on >= ? AND spent_on <= ?",
@@ -238,23 +377,44 @@ def get_total_spent_in_range(start_date: str, end_date: str, db_path=DB_PATH):
 
 # ─── Inflows ──────────────────────────────────────────────────────────────────
 
-def add_inflow(amount, inflow_type, inflow_date, cycle_start=None, cycle_end=None, note="", db_path=DB_PATH):
+def _sqlite_add_inflow(amount, inflow_type, inflow_date, cycle_start=None, cycle_end=None, note="", db_path=DB_PATH) -> int:
     with _connection(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO inflows(amount,type,date,cycle_start,cycle_end,note) VALUES(?,?,?,?,?,?)",
             (str(amount), inflow_type, inflow_date, cycle_start, cycle_end, (note or "").strip()),
         )
-        return cur.lastrowid
+        return int(cur.lastrowid or 0)
 
 
-def list_inflows(limit=50, db_path=DB_PATH):
+def add_inflow(amount, inflow_type, inflow_date, cycle_start=None, cycle_end=None, note="", db_path=DB_PATH) -> int:
+    local_id = _sqlite_add_inflow(amount, inflow_type, inflow_date, cycle_start, cycle_end, note, db_path)
+    if is_supabase_active(db_path):
+        try:
+            cloud_id = supabase_backend.add_inflow(amount, inflow_type, inflow_date, cycle_start, cycle_end, note)
+            return cloud_id or local_id
+        except Exception as e:
+            logger.warning("Supabase add_inflow failed: %s", e)
+    return local_id
+
+
+def list_inflows(limit=50, db_path=DB_PATH) -> list[dict]:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.list_inflows(limit)
+        except Exception as e:
+            logger.warning("Supabase list_inflows failed, falling back to SQLite: %s", e)
     with _connection(db_path) as conn:
         return [dict(row) for row in conn.execute(
             "SELECT * FROM inflows ORDER BY date DESC, id DESC LIMIT ?", (limit,)
         )]
 
 
-def get_inflows_in_range(start_date: str, end_date: str, db_path=DB_PATH):
+def get_inflows_in_range(start_date: str, end_date: str, db_path=DB_PATH) -> list[dict]:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.get_inflows_in_range(start_date, end_date)
+        except Exception as e:
+            logger.warning("Supabase get_inflows_in_range failed, falling back to SQLite: %s", e)
     with _connection(db_path) as conn:
         return [dict(row) for row in conn.execute(
             "SELECT * FROM inflows WHERE date >= ? AND date <= ? ORDER BY date DESC",
@@ -264,18 +424,35 @@ def get_inflows_in_range(start_date: str, end_date: str, db_path=DB_PATH):
 
 # ─── Liabilities ──────────────────────────────────────────────────────────────
 
-def add_liability(name, liability_type, emi_amount, principal=0, interest_rate=0.0,
-                  tenure_remaining=1, due_day=1, note="", db_path=DB_PATH):
+def _sqlite_add_liability(name, liability_type, emi_amount, principal=0, interest_rate=0.0,
+                          tenure_remaining=1, due_day=1, note="", db_path=DB_PATH) -> int:
     with _connection(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO liabilities(name,type,principal,emi_amount,interest_rate,tenure_remaining,due_day,note) VALUES(?,?,?,?,?,?,?,?)",
             (name, liability_type, str(principal), str(emi_amount), interest_rate,
              tenure_remaining, due_day, (note or "").strip()),
         )
-        return cur.lastrowid
+        return int(cur.lastrowid or 0)
 
 
-def list_liabilities(status="ACTIVE", db_path=DB_PATH):
+def add_liability(name, liability_type, emi_amount, principal=0, interest_rate=0.0,
+                  tenure_remaining=1, due_day=1, note="", db_path=DB_PATH) -> int:
+    local_id = _sqlite_add_liability(name, liability_type, emi_amount, principal, interest_rate, tenure_remaining, due_day, note, db_path)
+    if is_supabase_active(db_path):
+        try:
+            cloud_id = supabase_backend.add_liability(name, liability_type, emi_amount, principal, interest_rate, tenure_remaining, due_day, note)
+            return cloud_id or local_id
+        except Exception as e:
+            logger.warning("Supabase add_liability failed: %s", e)
+    return local_id
+
+
+def list_liabilities(status="ACTIVE", db_path=DB_PATH) -> list[dict]:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.list_liabilities(status)
+        except Exception as e:
+            logger.warning("Supabase list_liabilities failed, falling back to SQLite: %s", e)
     with _connection(db_path) as conn:
         if status:
             return [dict(row) for row in conn.execute(
@@ -287,25 +464,39 @@ def list_liabilities(status="ACTIVE", db_path=DB_PATH):
 def update_liability_status(liability_id, status, db_path=DB_PATH):
     with _connection(db_path) as conn:
         conn.execute("UPDATE liabilities SET status=? WHERE id=?", (status, int(liability_id)))
+    if is_supabase_active(db_path):
+        try:
+            supabase_backend.update_liability_status(liability_id, status)
+        except Exception as e:
+            logger.warning("Supabase update_liability_status failed: %s", e)
 
 
 def delete_liability(liability_id, db_path=DB_PATH):
     with _connection(db_path) as conn:
         conn.execute("DELETE FROM liabilities WHERE id=?", (int(liability_id),))
+    if is_supabase_active(db_path):
+        try:
+            supabase_backend.delete_liability(liability_id)
+        except Exception as e:
+            logger.warning("Supabase delete_liability failed: %s", e)
 
 
 def decrement_tenure(liability_id, db_path=DB_PATH):
-    """Decrease tenure by 1; if it reaches 0, mark as COMPLETED."""
     with _connection(db_path) as conn:
         conn.execute("UPDATE liabilities SET tenure_remaining = MAX(0, tenure_remaining - 1) WHERE id=?", (int(liability_id),))
         row = conn.execute("SELECT tenure_remaining FROM liabilities WHERE id=?", (int(liability_id),)).fetchone()
         if row and row["tenure_remaining"] <= 0:
             conn.execute("UPDATE liabilities SET status='COMPLETED' WHERE id=?", (int(liability_id),))
+    if is_supabase_active(db_path):
+        try:
+            supabase_backend.decrement_tenure(liability_id)
+        except Exception as e:
+            logger.warning("Supabase decrement_tenure failed: %s", e)
 
 
 # ─── Liability Payments ──────────────────────────────────────────────────────
 
-def add_liability_payment(liability_id, amount, paid_date=None, db_path=DB_PATH):
+def _sqlite_add_liability_payment(liability_id, amount, paid_date=None, db_path=DB_PATH) -> int:
     if paid_date is None:
         paid_date = date.today().isoformat()
     with _connection(db_path) as conn:
@@ -313,10 +504,26 @@ def add_liability_payment(liability_id, amount, paid_date=None, db_path=DB_PATH)
             "INSERT INTO liability_payments(liability_id,paid_date,amount) VALUES(?,?,?)",
             (int(liability_id), paid_date, str(amount)),
         )
-        return cur.lastrowid
+        return int(cur.lastrowid or 0)
 
 
-def list_liability_payments(liability_id=None, db_path=DB_PATH):
+def add_liability_payment(liability_id, amount, paid_date=None, db_path=DB_PATH) -> int:
+    local_id = _sqlite_add_liability_payment(liability_id, amount, paid_date, db_path)
+    if is_supabase_active(db_path):
+        try:
+            cloud_id = supabase_backend.add_liability_payment(liability_id, amount, paid_date)
+            return cloud_id or local_id
+        except Exception as e:
+            logger.warning("Supabase add_liability_payment failed: %s", e)
+    return local_id
+
+
+def list_liability_payments(liability_id=None, db_path=DB_PATH) -> list[dict]:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.list_liability_payments(liability_id)
+        except Exception as e:
+            logger.warning("Supabase list_liability_payments failed, falling back to SQLite: %s", e)
     with _connection(db_path) as conn:
         if liability_id is not None:
             return [dict(row) for row in conn.execute(
@@ -325,17 +532,18 @@ def list_liability_payments(liability_id=None, db_path=DB_PATH):
         return [dict(row) for row in conn.execute("SELECT * FROM liability_payments ORDER BY paid_date DESC")]
 
 
-def get_pending_emis_total(cycle_start: str, cycle_end: str, db_path=DB_PATH):
-    """Total pending EMIs for active liabilities whose due_day falls within the cycle
-    and haven't been paid in this cycle."""
-    from decimal import Decimal
+def get_pending_emis_total(cycle_start: str, cycle_end: str, db_path=DB_PATH) -> Decimal:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.get_pending_emis_total(cycle_start, cycle_end)
+        except Exception as e:
+            logger.warning("Supabase get_pending_emis_total failed, falling back to SQLite: %s", e)
     with _connection(db_path) as conn:
         liabilities = conn.execute(
             "SELECT id, emi_amount, due_day FROM liabilities WHERE status='ACTIVE'"
         ).fetchall()
         total = Decimal("0.00")
         for lia in liabilities:
-            # Check if already paid in this cycle
             paid = conn.execute(
                 "SELECT COUNT(*) as cnt FROM liability_payments WHERE liability_id=? AND paid_date>=? AND paid_date<=?",
                 (lia["id"], cycle_start, cycle_end),
@@ -347,16 +555,32 @@ def get_pending_emis_total(cycle_start: str, cycle_end: str, db_path=DB_PATH):
 
 # ─── Savings Goals ────────────────────────────────────────────────────────────
 
-def add_savings_goal(name, target_amount, deadline=None, priority=1, db_path=DB_PATH):
+def _sqlite_add_savings_goal(name, target_amount, deadline=None, priority=1, db_path=DB_PATH) -> int:
     with _connection(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO savings_goals(name,target_amount,deadline,priority) VALUES(?,?,?,?)",
             (name, str(target_amount), deadline, priority),
         )
-        return cur.lastrowid
+        return int(cur.lastrowid or 0)
 
 
-def list_savings_goals(status="ACTIVE", db_path=DB_PATH):
+def add_savings_goal(name, target_amount, deadline=None, priority=1, db_path=DB_PATH) -> int:
+    local_id = _sqlite_add_savings_goal(name, target_amount, deadline, priority, db_path)
+    if is_supabase_active(db_path):
+        try:
+            cloud_id = supabase_backend.add_savings_goal(name, target_amount, deadline, priority)
+            return cloud_id or local_id
+        except Exception as e:
+            logger.warning("Supabase add_savings_goal failed: %s", e)
+    return local_id
+
+
+def list_savings_goals(status="ACTIVE", db_path=DB_PATH) -> list[dict]:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.list_savings_goals(status)
+        except Exception as e:
+            logger.warning("Supabase list_savings_goals failed, falling back to SQLite: %s", e)
     with _connection(db_path) as conn:
         if status:
             return [dict(row) for row in conn.execute(
@@ -368,21 +592,36 @@ def list_savings_goals(status="ACTIVE", db_path=DB_PATH):
 def update_savings_goal_amount(goal_id, new_amount, db_path=DB_PATH):
     with _connection(db_path) as conn:
         conn.execute("UPDATE savings_goals SET current_amount=? WHERE id=?", (str(new_amount), int(goal_id)))
+    if is_supabase_active(db_path):
+        try:
+            supabase_backend.update_savings_goal_amount(goal_id, new_amount)
+        except Exception as e:
+            logger.warning("Supabase update_savings_goal_amount failed: %s", e)
 
 
 def update_savings_goal_status(goal_id, status, db_path=DB_PATH):
     with _connection(db_path) as conn:
         conn.execute("UPDATE savings_goals SET status=? WHERE id=?", (status, int(goal_id)))
+    if is_supabase_active(db_path):
+        try:
+            supabase_backend.update_savings_goal_status(goal_id, status)
+        except Exception as e:
+            logger.warning("Supabase update_savings_goal_status failed: %s", e)
 
 
 def delete_savings_goal(goal_id, db_path=DB_PATH):
     with _connection(db_path) as conn:
         conn.execute("DELETE FROM savings_goals WHERE id=?", (int(goal_id),))
+    if is_supabase_active(db_path):
+        try:
+            supabase_backend.delete_savings_goal(goal_id)
+        except Exception as e:
+            logger.warning("Supabase delete_savings_goal failed: %s", e)
 
 
 # ─── Savings Transfers ───────────────────────────────────────────────────────
 
-def add_savings_transfer(goal_id, amount, transfer_date=None, db_path=DB_PATH):
+def _sqlite_add_savings_transfer(goal_id, amount, transfer_date=None, db_path=DB_PATH) -> int:
     if transfer_date is None:
         transfer_date = date.today().isoformat()
     with _connection(db_path) as conn:
@@ -390,20 +629,33 @@ def add_savings_transfer(goal_id, amount, transfer_date=None, db_path=DB_PATH):
             "INSERT INTO savings_transfers(goal_id,amount,date) VALUES(?,?,?)",
             (int(goal_id), str(amount), transfer_date),
         )
-        # Update current_amount on the goal
-        from decimal import Decimal
         row = conn.execute("SELECT current_amount FROM savings_goals WHERE id=?", (int(goal_id),)).fetchone()
         if row:
             new_amt = Decimal(row["current_amount"]) + Decimal(str(amount))
             conn.execute("UPDATE savings_goals SET current_amount=? WHERE id=?", (str(new_amt), int(goal_id)))
-            # Check if goal reached
             target_row = conn.execute("SELECT target_amount FROM savings_goals WHERE id=?", (int(goal_id),)).fetchone()
             if target_row and new_amt >= Decimal(target_row["target_amount"]):
                 conn.execute("UPDATE savings_goals SET status='REACHED' WHERE id=?", (int(goal_id),))
-        return cur.lastrowid
+        return int(cur.lastrowid or 0)
 
 
-def list_savings_transfers(goal_id=None, db_path=DB_PATH):
+def add_savings_transfer(goal_id, amount, transfer_date=None, db_path=DB_PATH) -> int:
+    local_id = _sqlite_add_savings_transfer(goal_id, amount, transfer_date, db_path)
+    if is_supabase_active(db_path):
+        try:
+            cloud_id = supabase_backend.add_savings_transfer(goal_id, amount, transfer_date)
+            return cloud_id or local_id
+        except Exception as e:
+            logger.warning("Supabase add_savings_transfer failed: %s", e)
+    return local_id
+
+
+def list_savings_transfers(goal_id=None, db_path=DB_PATH) -> list[dict]:
+    if is_supabase_active(db_path):
+        try:
+            return supabase_backend.list_savings_transfers(goal_id)
+        except Exception as e:
+            logger.warning("Supabase list_savings_transfers failed, falling back to SQLite: %s", e)
     with _connection(db_path) as conn:
         if goal_id is not None:
             return [dict(row) for row in conn.execute(
@@ -415,7 +667,7 @@ def list_savings_transfers(goal_id=None, db_path=DB_PATH):
 # ─── Data Reset ──────────────────────────────────────────────────────────────
 
 def clear_all_data(db_path=DB_PATH):
-    """Wipe all user records and restore settings to clean defaults."""
+    """Wipe all user records in local SQLite and Supabase (if active)."""
     with _connection(db_path) as conn:
         conn.execute("DELETE FROM expenses")
         conn.execute("DELETE FROM plans")
@@ -426,3 +678,8 @@ def clear_all_data(db_path=DB_PATH):
         conn.execute("DELETE FROM savings_goals")
         conn.execute("UPDATE settings SET payday_day_of_month=1, inflow_type='SALARY', expected_amount='0', currency='₹', use_custom_days=0, custom_days_left=30 WHERE id=1")
         conn.execute("DELETE FROM sqlite_sequence")
+    if is_supabase_active(db_path):
+        try:
+            supabase_backend.clear_all_data()
+        except Exception as e:
+            logger.warning("Supabase clear_all_data failed: %s", e)
