@@ -436,19 +436,19 @@ def get_inflows_in_range(start_date: str, end_date: str, db_path=DB_PATH) -> lis
 
 # ─── Liabilities ──────────────────────────────────────────────────────────────
 
-def _sqlite_add_liability(name, liability_type, emi_amount, principal=0, interest_rate=0.0,
-                          tenure_remaining=1, due_day=1, note="", db_path=DB_PATH) -> int:
+def _sqlite_add_liability(name: str, liability_type: str, emi_amount: Any, principal: Any = 0, interest_rate: Optional[float] = 0.0,
+                          tenure_remaining: int = 1, due_day: int = 1, note: Optional[str] = "", db_path=DB_PATH) -> int:
     with _connection(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO liabilities(name,type,principal,emi_amount,interest_rate,tenure_remaining,due_day,note) VALUES(?,?,?,?,?,?,?,?)",
-            (name, liability_type, str(principal), str(emi_amount), interest_rate,
+            (name, liability_type, str(principal), str(emi_amount), interest_rate or 0.0,
              tenure_remaining, due_day, (note or "").strip()),
         )
         return int(cur.lastrowid or 0)
 
 
-def add_liability(name, liability_type, emi_amount, principal=0, interest_rate=0.0,
-                  tenure_remaining=1, due_day=1, note="", db_path=DB_PATH) -> int:
+def add_liability(name: str, liability_type: str, emi_amount: Any, principal: Any = 0, interest_rate: Optional[float] = 0.0,
+                  tenure_remaining: int = 1, due_day: int = 1, note: Optional[str] = "", db_path=DB_PATH) -> int:
     local_id = _sqlite_add_liability(name, liability_type, emi_amount, principal, interest_rate, tenure_remaining, due_day, note, db_path)
     if is_supabase_active(db_path):
         try:
@@ -459,7 +459,7 @@ def add_liability(name, liability_type, emi_amount, principal=0, interest_rate=0
     return local_id
 
 
-def list_liabilities(status="ACTIVE", db_path=DB_PATH) -> list[dict]:
+def list_liabilities(status: Optional[str] = "ACTIVE", db_path=DB_PATH) -> list[dict]:
     if is_supabase_active(db_path):
         try:
             return supabase_backend.list_liabilities(status)

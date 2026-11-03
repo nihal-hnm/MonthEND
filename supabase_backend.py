@@ -416,8 +416,8 @@ def get_inflows_in_range(start_date: str, end_date: str) -> list[dict[str, Any]]
 
 # ─── Liabilities ──────────────────────────────────────────────────────────────
 
-def add_liability(name: str, liability_type: str, emi_amount: Any, principal: Any = 0, interest_rate: float = 0.0,
-                  tenure_remaining: int = 1, due_day: int = 1, note: str = "") -> int:
+def add_liability(name: str, liability_type: str, emi_amount: Any, principal: Any = 0, interest_rate: Optional[float] = 0.0,
+                  tenure_remaining: int = 1, due_day: int = 1, note: Optional[str] = "") -> int:
     client = get_client()
     if client is None:
         return 0
@@ -427,7 +427,7 @@ def add_liability(name: str, liability_type: str, emi_amount: Any, principal: An
         "type": str(liability_type),
         "principal": str(principal),
         "emi_amount": str(emi_amount),
-        "interest_rate": float(interest_rate),
+        "interest_rate": float(interest_rate or 0.0),
         "tenure_remaining": int(tenure_remaining),
         "due_day": int(due_day),
         "status": "ACTIVE",

@@ -10,6 +10,7 @@ Provides:
 from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
+import math
 
 import database
 from cycle_engine import CycleInfo, get_current_cycle
@@ -135,7 +136,7 @@ def classify_spending_persona(payday_day: int) -> dict:
     if values:
         mean_val = sum(values, Decimal("0")) / len(values)
         variance = sum((v - mean_val) ** 2 for v in values) / len(values)
-        std_dev = float(variance.sqrt()) if hasattr(variance, 'sqrt') else float(variance ** Decimal("0.5"))
+        std_dev = math.sqrt(max(0.0, float(variance)))
         cv = std_dev / float(mean_val) if mean_val > 0 else 0
     else:
         cv = 0

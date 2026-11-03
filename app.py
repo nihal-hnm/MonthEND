@@ -499,7 +499,7 @@ with st.sidebar:
         new_inflow_type = st.selectbox(
             "Income Stream Type", INFLOW_TYPES,
             index=INFLOW_TYPES.index(INFLOW_TYPE) if INFLOW_TYPE in INFLOW_TYPES else 0,
-            format_func=lambda x: INFLOW_LABELS.get(x, x),
+            format_func=lambda x: str(INFLOW_LABELS.get(x, x)),
         )
         new_expected = st.number_input(
             "Expected Monthly Income (₹)", min_value=0.0,
@@ -775,7 +775,7 @@ with tab_log:
 
     if submitted:
         hour_now = datetime.now().hour
-        impulse_result = check_impulse_flags(amount, category, metrics.safe_daily_limit, hour_now)
+        impulse_result = check_impulse_flags(amount, str(category or "Other"), metrics.safe_daily_limit, hour_now)
 
         if impulse_result["needs_cooldown"]:
             st.warning("🛑 **HIGH IMPULSE VELOCITY TRIGGERED** — Cooldown activated:")
@@ -936,7 +936,7 @@ with tab_lia:
 
         if st.form_submit_button("➕ Register Facility", type="primary", use_container_width=True):
             if nl_name and nl_emi > 0:
-                database.add_liability(nl_name, nl_type, nl_emi, nl_principal, nl_rate, nl_tenure, nl_due, nl_note)
+                database.add_liability(nl_name, str(nl_type or "EMI"), nl_emi, float(nl_principal), float(nl_rate or 0.0), int(nl_tenure), int(nl_due), str(nl_note or ""))
                 st.success(f"Facility '{nl_name}' registered successfully!")
                 st.rerun()
             else:

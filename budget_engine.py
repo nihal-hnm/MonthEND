@@ -4,6 +4,7 @@ Extended with cycle-aware calculations and true disposable income.
 """
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
+from typing import Any, Optional
 
 CENT = Decimal("0.01")
 
@@ -31,8 +32,8 @@ class BudgetMetrics:
     days_remaining: int = 0
 
 
-def calculate_budget(total_money, fixed_expenses, days: int, reserve=0,
-                     pending_emis=0, spent_this_cycle=0, days_remaining=None) -> BudgetMetrics:
+def calculate_budget(total_money: Any, fixed_expenses: Any, days: int, reserve: Any = 0,
+                     pending_emis: Any = 0, spent_this_cycle: Any = 0, days_remaining: Optional[int] = None) -> BudgetMetrics:
     """Calculate the spendable pool after bills, reserve, and pending EMIs."""
     total = money(total_money)
     fixed = money(fixed_expenses)
