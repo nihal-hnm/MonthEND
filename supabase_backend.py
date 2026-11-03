@@ -175,7 +175,7 @@ def test_connection() -> tuple[bool, str, dict[str, Any]]:
         }
     except Exception as exc:
         err_msg = str(exc)
-        if "relation \"public.settings\" does not exist" in err_msg or "PGRST204" in err_msg or "404" in err_msg:
+        if "relation \"public.settings\" does not exist" in err_msg or "PGRST204" in err_msg or "PGRST205" in err_msg or "Could not find the table" in err_msg or "404" in err_msg:
             return False, "Connected to Supabase, but tables are missing. Please execute 'supabase_schema.sql' in the Supabase SQL Editor.", {
                 "configured": True,
                 "schema_missing": True,
