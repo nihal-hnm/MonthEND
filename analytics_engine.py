@@ -62,7 +62,7 @@ def mom_category_delta(cycle: CycleInfo, payday_day: int) -> list[dict]:
         })
 
     # Sort by absolute delta descending
-    result.sort(key=lambda x: abs(x["delta_pct"]), reverse=True)
+    result.sort(key=lambda x: abs(float(str(x["delta_pct"]))), reverse=True)
     return result
 
 
@@ -106,7 +106,7 @@ def classify_spending_persona(payday_day: int) -> dict:
         return {"persona": "New User", "reason": "No previous cycle data available", "icon": "🆕"}
 
     # Aggregate by day
-    daily_totals = defaultdict(Decimal)
+    daily_totals: dict[date, Decimal] = defaultdict(Decimal)
     weekend_total = Decimal("0")
     mid_month_total = Decimal("0")
     grand_total = Decimal("0")
@@ -216,7 +216,7 @@ def generate_habit_tips(
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def _sum_by_category(expenses: list[dict]) -> dict[str, Decimal]:
-    result = defaultdict(Decimal)
+    result: dict[str, Decimal] = defaultdict(Decimal)
     for e in expenses:
         result[e["category"]] += money(e["amount"])
     return dict(result)

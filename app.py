@@ -717,7 +717,7 @@ with tab_log:
                     st.info(f"💡 {flag}")
 
             database.add_expense(
-                plan_id=None, amount=money(amount), category=category,
+                plan_id=None, amount=money(amount), category=str(category or "Other"),
                 note=note, spent_on=spend_date.isoformat(),
                 payment_mode=payment_mode, is_planned=is_planned, hour_logged=hour_now,
             )
