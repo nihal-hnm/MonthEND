@@ -11,7 +11,6 @@ from pathlib import Path
 import streamlit as st
 
 import database
-import supabase_backend
 from analytics_engine import (
     category_surges,
     classify_spending_persona,
@@ -323,23 +322,6 @@ else:
 
 header_col1, header_col2 = st.columns([5, 1.4])
 
-backend_info = database.get_backend_info()
-if backend_info["active_backend"] == "supabase" and backend_info["connected"]:
-    b_color = "#16a34a" if is_light else "#34d399"
-    b_bg = "#f0fdf4" if is_light else "rgba(16, 185, 129, 0.15)"
-    b_border = "#bbf7d0" if is_light else "rgba(16, 185, 129, 0.3)"
-    b_text = "🟢 SUPABASE CLOUD"
-elif backend_info["configured"] and not backend_info["connected"]:
-    b_color = "#d97706" if is_light else "#fbbf24"
-    b_bg = "#fffbeb" if is_light else "rgba(245, 158, 11, 0.15)"
-    b_border = "#fde68a" if is_light else "rgba(245, 158, 11, 0.3)"
-    b_text = "⚠️ SUPABASE (CHECK SETUP)"
-else:
-    b_color = "#64748b" if is_light else "#94a3b8"
-    b_bg = "#f1f5f9" if is_light else "#1e293b"
-    b_border = "#e2e8f0" if is_light else "#334155"
-    b_text = "💾 LOCAL SQLITE"
-
 with header_col1:
     title_badge_html = f"""
     <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 4px;">
@@ -353,10 +335,6 @@ with header_col1:
                      color: {'#0369a1' if is_light else '#38bdf8'}; 
                      border: 1px solid {'#bae6fd' if is_light else '#334155'};">
             AIR-GAPPED SOVEREIGN FINTECH
-        </span>
-        <span style="font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 9999px;
-                     background: {b_bg}; color: {b_color}; border: 1px solid {b_border};">
-            {b_text}
         </span>
     </div>
     <div style="font-size: 0.95rem; color: {'#64748b' if is_light else '#94a3b8'}; margin-bottom: 12px;">
@@ -433,63 +411,6 @@ if check_inflow_overdue(PAYDAY, EXPECTED_AMOUNT):
 
 with st.sidebar:
     st.markdown("### ⚙️ Command Center")
-
-    with st.expander("☁️ Supabase Cloud Backend", expanded=False):
-        st.markdown("**Cloud Database & Persistence**")
-        b_info = database.get_backend_info()
-        if b_info["connected"]:
-            st.success(f"🟢 **Connected to Supabase**\n\n`{b_info['url']}`")
-        elif b_info["configured"]:
-            if b_info.get("schema_missing"):
-                st.warning("⚠️ **Tables Missing**: Connected to Supabase, but schema is not installed yet. Execute `supabase_schema.sql` in Supabase SQL Editor.")
-            else:
-                st.error(f"🔴 **Connection Error**: {b_info.get('message', 'Cannot reach Supabase')}")
-        else:
-            st.info("💾 **Local SQLite Mode**: Enter your Supabase credentials below to enable cloud backup and sync.")
-
-        supa_cfg = supabase_backend.get_config()
-        new_supa_url = st.text_input("Supabase Project URL", value=supa_cfg.get("url", ""), placeholder="https://xyz.supabase.co", key="supa_url_in")
-        new_supa_key = st.text_input("Supabase API Key (Anon / Service)", value=supa_cfg.get("key", ""), type="password", placeholder="eyJhbGciOi...", key="supa_key_in")
-        
-        mode_options = ["Auto (Prefer Supabase)", "Force Supabase Cloud", "Force Local SQLite"]
-        current_mode = supa_cfg.get("mode", "auto").lower()
-        mode_idx = 1 if current_mode == "supabase" else (2 if current_mode == "sqlite" else 0)
-        selected_mode_label = st.radio("Active Backend Mode", mode_options, index=mode_idx, key="supa_mode_radio")
-        selected_mode = "supabase" if selected_mode_label == "Force Supabase Cloud" else ("sqlite" if selected_mode_label == "Force Local SQLite" else "auto")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Save & Connect", key="save_supa_btn", use_container_width=True):
-                supabase_backend.save_config(new_supa_url, new_supa_key, mode=selected_mode)
-                st.success("Credentials saved!")
-                st.rerun()
-        with c2:
-            if st.button("Test Connection", key="test_supa_btn", use_container_width=True):
-                supabase_backend.save_config(new_supa_url, new_supa_key, mode=selected_mode)
-                ok, msg, _ = supabase_backend.test_connection()
-                if ok:
-                    st.success("Connection test passed!")
-                else:
-                    st.error(f"Test failed: {msg}")
-
-        if b_info["connected"]:
-            st.markdown("---")
-            st.markdown("**Cloud Synchronization**")
-            if st.button("🚀 Push Local SQLite Data to Supabase", key="push_sqlite_supa", use_container_width=True):
-                with st.spinner("Migrating local records to Supabase..."):
-                    try:
-                        sync_res = database.sync_sqlite_to_supabase()
-                        summary = ", ".join(f"{k}: {v}" for k, v in sync_res.items() if v > 0) or "0 rows"
-                        st.success(f"Migrated: {summary}")
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"Migration failed: {exc}")
-
-        with st.expander("📋 View SQL Setup Schema", expanded=False):
-            st.caption("Execute this schema in the Supabase SQL Editor to initialize all tables and security policies.")
-            schema_file = Path(__file__).with_name("supabase_schema.sql")
-            if schema_file.exists():
-                st.code(schema_file.read_text(encoding="utf-8"), language="sql")
 
     with st.expander("📅 Inflow & Payday Cycle", expanded=False):
         new_payday = st.number_input(
