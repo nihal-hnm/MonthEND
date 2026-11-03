@@ -1,6 +1,6 @@
-"""Survival Budget — Offline-first Indian personal finance dashboard.
-
-Tabs: Dashboard, Quick Log, Liabilities, Savings Goals, Analytics, Plan & Guidance, History
+"""Survival Budget / MonthEnd — Ultra-modern Indian personal finance dashboard.
+Designed with high-end FinTech aesthetics (Tailwind-inspired tokens, glassmorphism,
+tactile controls, and dark/light adaptive theming).
 """
 import json
 import time
@@ -45,10 +45,10 @@ from savings_engine import (
     transfer_to_goal,
 )
 
-# ─── Page Config ──────────────────────────────────────────────────────────────
+# ─── Page Configuration ────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="MonthEnd",
+    page_title="MonthEnd • Smart Financial Pacing",
     page_icon="📅",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -68,188 +68,414 @@ EXPECTED_AMOUNT = fmoney(settings.get("expected_amount", 0))
 
 cycle = get_current_cycle(PAYDAY)
 
-# ─── Header & Theme Toggle ───────────────────────────────────────────────────
+# ─── Theme State & Global CSS Injection ───────────────────────────────────────
 
 if "theme" not in st.session_state:
     st.session_state["theme"] = "dark"
 
-head_col, theme_col = st.columns([5, 1.3])
-with head_col:
-    st.title("📅 MonthEnd")
-    st.caption("Beat the month-end crunch — track every ₹, pace your cycle, kill impulse spends.")
-with theme_col:
-    st.write("")  # Vertical spacing alignment
-    is_light = st.toggle("☀️ Light Mode", value=(st.session_state["theme"] == "light"), key="theme_toggle")
-    st.session_state["theme"] = "light" if is_light else "dark"
+is_light = (st.session_state["theme"] == "light")
 
-# ─── Dynamic Theme Styling ───────────────────────────────────────────────────
+# Ultra-polished CSS styling for both Light and Dark themes
+COMMON_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
 
+html, body, [class*="css"] {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+
+/* Sleek Button Styles */
+div.stButton > button:first-child {
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 0.55rem 1.25rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid transparent;
+}
+div.stButton > button:first-child:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+div.stButton > button:first-child:active {
+    transform: translateY(0);
+}
+
+/* Tab Bar Modernization */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    padding: 6px;
+    border-radius: 12px;
+}
+.stTabs [data-baseweb="tab"] {
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.15s ease-in-out;
+}
+.stTabs [data-baseweb="tab-border"] {
+    display: none;
+}
+
+/* Card Elevations */
+[data-testid="stExpander"] {
+    border-radius: 12px !important;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+.streamlit-expanderHeader {
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+}
+
+/* Metric Container Cards */
+[data-testid="metric-container"] {
+    border-radius: 14px;
+    padding: 16px 20px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+[data-testid="metric-container"]:hover {
+    transform: translateY(-2px);
+}
+[data-testid="stMetricValue"] {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-weight: 700 !important;
+    font-size: 1.65rem !important;
+}
+[data-testid="stMetricLabel"] {
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Inputs & Form Elements */
+input, textarea, [data-baseweb="select"] {
+    border-radius: 8px !important;
+    font-size: 0.95rem !important;
+}
+
+/* Progress Bars */
+.stProgress > div > div > div > div {
+    border-radius: 9999px;
+}
+</style>
+"""
+
+LIGHT_THEME_CSS = """
+<style>
+/* Light Mode Theme */
+[data-testid="stAppViewContainer"] {
+    background-color: #f8fafc;
+    color: #0f172a;
+}
+[data-testid="stHeader"] {
+    background-color: rgba(248, 250, 252, 0.8);
+    backdrop-filter: blur(8px);
+}
+[data-testid="stSidebar"] {
+    background-color: #ffffff;
+    border-right: 1px solid #e2e8f0;
+}
+h1, h2, h3, h4, h5, h6 {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+}
+p, span, label, .stMarkdown {
+    color: #334155;
+}
+.stCaption, [data-testid="stCaptionContainer"] {
+    color: #64748b !important;
+}
+/* Metrics in Light Mode */
+[data-testid="metric-container"] {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+}
+[data-testid="stMetricLabel"] {
+    color: #64748b !important;
+}
+[data-testid="stMetricValue"] {
+    color: #0f172a !important;
+}
+/* Tabs in Light Mode */
+.stTabs [data-baseweb="tab-list"] {
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+}
+.stTabs [data-baseweb="tab"] {
+    color: #64748b;
+}
+.stTabs [aria-selected="true"] {
+    background-color: #ffffff !important;
+    color: #0284c7 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+/* Form Controls in Light Mode */
+div[data-baseweb="select"] > div {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+input, textarea {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+}
+[data-testid="stExpander"] {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+}
+.streamlit-expanderHeader {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+}
+</style>
+"""
+
+DARK_THEME_CSS = """
+<style>
+/* Dark Mode Theme */
+[data-testid="stAppViewContainer"] {
+    background-color: #0b0f19;
+    color: #f8fafc;
+}
+[data-testid="stHeader"] {
+    background-color: rgba(11, 15, 25, 0.8);
+    backdrop-filter: blur(8px);
+}
+[data-testid="stSidebar"] {
+    background-color: #111827;
+    border-right: 1px solid #1f293d;
+}
+h1, h2, h3, h4, h5, h6 {
+    color: #f8fafc !important;
+    font-weight: 700 !important;
+}
+p, span, label, .stMarkdown {
+    color: #cbd5e1;
+}
+.stCaption, [data-testid="stCaptionContainer"] {
+    color: #94a3b8 !important;
+}
+/* Metrics in Dark Mode */
+[data-testid="metric-container"] {
+    background: linear-gradient(145deg, #131b2e, #0f172a);
+    border: 1px solid #1f293d;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+[data-testid="stMetricLabel"] {
+    color: #94a3b8 !important;
+}
+[data-testid="stMetricValue"] {
+    color: #f8fafc !important;
+}
+/* Tabs in Dark Mode */
+.stTabs [data-baseweb="tab-list"] {
+    background-color: #111827;
+    border: 1px solid #1f293d;
+}
+.stTabs [data-baseweb="tab"] {
+    color: #94a3b8;
+}
+.stTabs [aria-selected="true"] {
+    background-color: #1e293b !important;
+    color: #38bdf8 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+/* Form Controls in Dark Mode */
+div[data-baseweb="select"] > div {
+    background-color: #111827 !important;
+    border-color: #1f293d !important;
+    color: #f8fafc !important;
+}
+input, textarea {
+    background-color: #111827 !important;
+    color: #f8fafc !important;
+    border: 1px solid #1f293d !important;
+}
+[data-testid="stExpander"] {
+    background-color: #111827;
+    border: 1px solid #1f293d;
+}
+.streamlit-expanderHeader {
+    background-color: #111827 !important;
+    color: #f8fafc !important;
+}
+</style>
+"""
+
+st.markdown(COMMON_CSS, unsafe_allow_html=True)
 if is_light:
-    st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;}
-    [data-testid="stAppViewContainer"] {
-        background-color: #f8fafc;
-        color: #0f172a;
-    }
-    [data-testid="stHeader"] {
-        background-color: rgba(248, 250, 252, 0.85);
-    }
-    [data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-right: 1px solid #e2e8f0;
-    }
-    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown {
-        color: #0f172a !important;
-    }
-    .stCaption, [data-testid="stCaptionContainer"] {
-        color: #64748b !important;
-    }
-    [data-testid="stMetricValue"] {
-        color: #0f172a !important;
-    }
-    [data-testid="stMetricLabel"] {
-        color: #475569 !important;
-    }
-    [data-testid="metric-container"] {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        padding: 14px;
-        border-radius: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #e2e8f0;
-        border-radius: 8px;
-        padding: 4px;
-        gap: 4px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        color: #475569 !important;
-        border-radius: 6px;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #ffffff !important;
-        color: #0284c7 !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-    }
-    [data-testid="stExpander"] {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-    }
-    .streamlit-expanderHeader {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown(LIGHT_THEME_CSS, unsafe_allow_html=True)
 else:
-    st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;}
-    [data-testid="metric-container"] {
-        background-color: #1e293b;
-        border: 1px solid #334155;
-        padding: 14px;
-        border-radius: 10px;
-    }
-    [data-testid="stMetricLabel"] {
-        color: #94a3b8 !important;
-    }
-    [data-testid="stMetricValue"] {
-        color: #f8fafc !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown(DARK_THEME_CSS, unsafe_allow_html=True)
 
-# Cycle status chip
+# ─── Navigation & Executive Header ───────────────────────────────────────────
+
+header_col1, header_col2 = st.columns([5, 1.4])
+
+with header_col1:
+    title_badge_html = f"""
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px;">
+        <span style="font-size: 2.1rem; font-weight: 800; letter-spacing: -0.02em; 
+                     background: linear-gradient(135deg, {'#0284c7, #2563eb' if is_light else '#38bdf8, #818cf8'});
+                     -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            MonthEnd
+        </span>
+        <span style="font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 9999px;
+                     background: {'#e0f2fe' if is_light else '#1e293b'}; 
+                     color: {'#0369a1' if is_light else '#38bdf8'}; 
+                     border: 1px solid {'#bae6fd' if is_light else '#334155'};">
+            AIR-GAPPED SOVEREIGN FINTECH
+        </span>
+    </div>
+    <div style="font-size: 0.95rem; color: {'#64748b' if is_light else '#94a3b8'}; margin-bottom: 12px;">
+        Intelligent financial pacing & anti-impulse defense for the Indian everyday economy.
+    </div>
+    """
+    st.markdown(title_badge_html, unsafe_allow_html=True)
+
+with header_col2:
+    st.write("")  # Spacing
+    theme_toggle_val = st.toggle(
+        "☀️ Light Mode",
+        value=(st.session_state["theme"] == "light"),
+        key="global_theme_toggle",
+    )
+    if theme_toggle_val != is_light:
+        st.session_state["theme"] = "light" if theme_toggle_val else "dark"
+        st.rerun()
+
+# ─── Top Inflow Status Banner ─────────────────────────────────────────────────
+
 chip_text = cycle_status_text(cycle, INFLOW_TYPE)
-if is_light:
-    chip_html = (
-        f'<div style="background:#e0f2fe;color:#0369a1;padding:8px 16px;border-radius:8px;'
-        f'font-weight:600;display:inline-block;margin-bottom:8px;border:1px solid #bae6fd;">'
-        f'📅 {chip_text}</div>'
-    )
-else:
-    chip_html = (
-        f'<div style="background:#1e293b;color:#38bdf8;padding:8px 16px;border-radius:8px;'
-        f'font-weight:600;display:inline-block;margin-bottom:8px;border:1px solid #334155;">'
-        f'📅 {chip_text}</div>'
-    )
-st.markdown(chip_html, unsafe_allow_html=True)
+cycle_progress_pct = min(100, int((cycle.day_index / max(1, cycle.total_days)) * 100))
+
+status_banner_html = f"""
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+            background: {'linear-gradient(135deg, #ffffff, #f1f5f9)' if is_light else 'linear-gradient(135deg, #111827, #1e293b)'};
+            border: 1px solid {'#e2e8f0' if is_light else '#1f293d'};
+            padding: 12px 20px; border-radius: 14px; margin-bottom: 20px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, {'0.03' if is_light else '0.2'});">
+    <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+                    background: {'#e0f2fe' if is_light else 'rgba(56, 189, 248, 0.15)'}; font-size: 1.25rem;">
+            📅
+        </div>
+        <div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: {'#0f172a' if is_light else '#f8fafc'};">
+                {chip_text}
+            </div>
+            <div style="font-size: 0.8rem; color: {'#64748b' if is_light else '#94a3b8'};">
+                Billing Cycle: {cycle.cycle_start.strftime('%b %d')} &rarr; {cycle.cycle_end.strftime('%b %d, %Y')} ({cycle.total_days} days total)
+            </div>
+        </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; min-width: 220px;">
+        <div style="flex: 1;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; color: {'#475569' if is_light else '#94a3b8'};">
+                <span>Cycle Elapsed</span>
+                <span>{cycle_progress_pct}%</span>
+            </div>
+            <div style="width: 100%; height: 6px; background: {'#e2e8f0' if is_light else '#334155'}; border-radius: 9999px; overflow: hidden;">
+                <div style="width: {cycle_progress_pct}%; height: 100%; background: {'#0284c7' if is_light else '#38bdf8'}; border-radius: 9999px;"></div>
+            </div>
+        </div>
+        <span style="font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: 8px;
+                     background: {'#f0fdf4' if is_light else 'rgba(16, 185, 129, 0.15)'}; 
+                     color: {'#16a34a' if is_light else '#34d399'}; 
+                     border: 1px solid {'#bbf7d0' if is_light else 'rgba(16, 185, 129, 0.3)'};">
+            {cycle.days_remaining}D LEFT
+        </span>
+    </div>
+</div>
+"""
+st.markdown(status_banner_html, unsafe_allow_html=True)
 
 # Overdue inflow alert
 if check_inflow_overdue(PAYDAY, EXPECTED_AMOUNT):
     st.error(
-        f"⚠️ Your {INFLOW_LABELS.get(INFLOW_TYPE, 'income')} hasn't been logged yet! "
-        f"Expected around day {PAYDAY} of the month. Log it in the sidebar."
+        f"⚠️ **Inflow Overdue**: Expected {INFLOW_LABELS.get(INFLOW_TYPE, 'Income')} on day {PAYDAY} has not been logged yet. "
+        "Log it in the sidebar to maintain accurate surplus and pacing calculations."
     )
 
-st.info("This tool provides automated financial survival pacing — not certified financial advice. All data stays on this device.")
-
-# ─── Sidebar ──────────────────────────────────────────────────────────────────
+# ─── Sidebar Settings & Inflow Center ────────────────────────────────────────
 
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st.markdown("### ⚙️ Command Center")
 
-    with st.expander("Cycle & Inflow Settings", expanded=False):
+    with st.expander("📅 Inflow & Payday Cycle", expanded=False):
         new_payday = st.number_input(
-            "Payday / inflow day of month", min_value=1, max_value=28,
-            value=PAYDAY, step=1, help="Which day your income arrives"
+            "Payday / Anchor Day", min_value=1, max_value=28,
+            value=PAYDAY, step=1, help="Day of the month when your main income arrives"
         )
         new_inflow_type = st.selectbox(
-            "Income type", INFLOW_TYPES,
+            "Income Stream Type", INFLOW_TYPES,
             index=INFLOW_TYPES.index(INFLOW_TYPE) if INFLOW_TYPE in INFLOW_TYPES else 0,
             format_func=lambda x: INFLOW_LABELS.get(x, x),
         )
         new_expected = st.number_input(
-            "Expected monthly income (₹)", min_value=0.0,
+            "Expected Monthly Income (₹)", min_value=0.0,
             value=float(EXPECTED_AMOUNT), step=500.0, format="%.0f",
         )
-        if st.button("Save Settings", key="save_settings"):
+        if st.button("Save Cycle Settings", use_container_width=True):
             database.save_settings(new_payday, new_inflow_type, new_expected)
-            st.success("Settings saved!")
+            st.success("Cycle settings updated!")
             st.rerun()
 
-    st.divider()
-    st.header("💰 Your Runway")
-    total = st.number_input("Available money (₹)", min_value=0.0, value=float(EXPECTED_AMOUNT or 5000.0), step=500.0, format="%.0f")
-    fixed = st.number_input("Fixed bills / obligations (₹)", min_value=0.0, value=0.0, step=100.0, format="%.0f")
-    reserve = st.number_input("Emergency reserve (₹)", min_value=0.0, value=0.0, step=100.0, format="%.0f")
+    st.markdown("---")
+    st.markdown("### 💰 Financial Runway")
+    total = st.number_input(
+        "Available Cash / Balance (₹)", min_value=0.0,
+        value=float(EXPECTED_AMOUNT or 5000.0), step=500.0, format="%.0f",
+        help="All liquid funds currently at your disposal"
+    )
+    fixed = st.number_input(
+        "Fixed Living Bills (₹)", min_value=0.0, value=0.0, step=100.0, format="%.0f",
+        help="Mandatory living costs (Rent, PG fee, Mess fee, WiFi)"
+    )
+    reserve = st.number_input(
+        "Protected Emergency Reserve (₹)", min_value=0.0, value=0.0, step=100.0, format="%.0f",
+        help="Untouchable safety cushion for medical or emergency needs"
+    )
 
-    st.divider()
-    st.subheader("📝 Plan Context")
-    plan_name = st.text_input("Plan name", value="Monthly survival plan")
-    pantry = st.text_area("Food at hand", placeholder="Rice, dal, atta, oil…")
-    lifestyle = st.text_input("Lifestyle", placeholder="Student, shared PG…")
-    location = st.text_input("Region", placeholder="Mumbai / Delhi / Bangalore…")
+    st.markdown("---")
+    with st.expander("📝 Lifestyle & Context", expanded=False):
+        plan_name = st.text_input("Plan Name", value="Monthly Survival Plan")
+        pantry = st.text_area("Pantry Staples on Hand", placeholder="Rice, dal, atta, oil, tea, spices…")
+        lifestyle = st.text_input("Living Constraints", placeholder="Student PG, shared fridge, no vehicle…")
+        location = st.text_input("City / Region", placeholder="Bangalore, Mumbai, Delhi, Pune…")
 
-    st.divider()
-    with st.expander("📥 Log Inflow", expanded=False):
-        inflow_amt = st.number_input("Inflow amount (₹)", min_value=0.0, step=500.0, format="%.0f", key="inflow_amt")
-        inflow_note = st.text_input("Inflow note", key="inflow_note", placeholder="October salary…")
-        if st.button("Log Inflow", key="log_inflow"):
+    with st.expander("📥 Log Incoming Inflow", expanded=False):
+        inflow_amt = st.number_input("Inflow Amount (₹)", min_value=0.0, step=500.0, format="%.0f", key="inflow_amt")
+        inflow_note = st.text_input("Source / Reference", key="inflow_note", placeholder="Salary, Dad allowance, Freelance…")
+        if st.button("Record Inflow", key="log_inflow", use_container_width=True):
             if inflow_amt > 0:
                 database.add_inflow(
                     inflow_amt, INFLOW_TYPE, date.today().isoformat(),
                     cycle.cycle_start.isoformat(), cycle.cycle_end.isoformat(), inflow_note,
                 )
-                st.success(f"Inflow of {format_inr(inflow_amt)} logged!")
+                st.success(f"Inflow of {format_inr(inflow_amt)} recorded!")
                 st.rerun()
 
-    with st.expander("🗑️ Reset & Clear Data", expanded=False):
-        st.caption("Erase all logged expenses, plans, inflows, liabilities, and goals from this device.")
-        if st.button("Clear All Data & Cache", type="secondary", use_container_width=True):
+    with st.expander("🗑️ Reset & Data Hygiene", expanded=False):
+        st.caption("Erase all logged records (expenses, plans, inflows, liabilities, and goals) from this device.")
+        if st.button("Wipe All Local Data", type="secondary", use_container_width=True):
             database.clear_all_data()
             st.session_state.clear()
             st.cache_data.clear()
-            st.success("All data and session cache cleared!")
+            st.success("All local data wiped cleanly!")
             st.rerun()
 
-# ─── Core Budget Computation ─────────────────────────────────────────────────
+# ─── Core Deterministic Budget Engine ─────────────────────────────────────────
 
-# Get cycle-aware spending
 spent_this_cycle = database.get_total_spent_in_range(
     cycle.cycle_start.isoformat(), cycle.cycle_end.isoformat()
 )
@@ -265,186 +491,218 @@ try:
         days_remaining=cycle.days_remaining,
     )
 except (ValueError, InvalidOperation) as exc:
-    st.error(str(exc))
+    st.error(f"Computation Error: {exc}")
     st.stop()
 
 if money(total) - money(fixed) <= 0:
-    st.error("Fixed obligations exceed available capital. Address bills first.")
+    st.error("🚨 **Deficit Alert**: Fixed living obligations exceed or equal available capital. Prioritize immediate rent/mess bills before discretionary spends.")
 
-# ─── Top Metrics Row ─────────────────────────────────────────────────────────
+# ─── KPI Dashboard Cards ──────────────────────────────────────────────────────
 
-m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("Available", format_inr(metrics.total_money))
-m2.metric("After Bills", format_inr(max(Decimal("0"), metrics.total_money - metrics.fixed_expenses)))
-m3.metric("True Disposable", format_inr(metrics.true_disposable), help="After bills, reserve & pending EMIs")
-m4.metric("Safe Daily Limit", format_inr(metrics.safe_daily_limit), f"{cycle.days_remaining} days left")
-m5.metric("Spent This Cycle", format_inr(spent_this_cycle))
+kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
+kpi1.metric("Total Liquid", format_inr(metrics.total_money))
+kpi2.metric("After Bills", format_inr(max(Decimal("0"), metrics.total_money - metrics.fixed_expenses)))
+kpi3.metric(
+    "True Disposable", format_inr(metrics.true_disposable),
+    help="Actual spendable cash after deducting fixed bills, protected emergency reserve, and pending BNPL/EMIs."
+)
+kpi4.metric(
+    "Safe Daily Limit", format_inr(metrics.safe_daily_limit),
+    f"{cycle.days_remaining} days left in cycle",
+    help="Maximum spend allowable today to guarantee runway survival."
+)
+kpi5.metric(
+    "Spent This Cycle", format_inr(spent_this_cycle),
+    help="Cumulative outflow recorded from start of active cycle."
+)
 
 if metrics.critical and metrics.usable_pool > 0:
-    st.error("🚨 Extreme Austerity: daily limit is very low. Prioritize mess/tiffin, cut all discretionary spend.")
+    st.error("🚨 **Extreme Austerity Protocol**: Safe daily ceiling is under ₹100/day. Rely strictly on hostel mess/tiffin, bulk dal-rice cooking, and suspend all non-essential outflows.")
 
-# ─── Tabs ─────────────────────────────────────────────────────────────────────
+# ─── Workspace Tabs ───────────────────────────────────────────────────────────
 
 tab_dash, tab_log, tab_lia, tab_save, tab_analytics, tab_plan, tab_history = st.tabs([
-    "📊 Dashboard", "⚡ Quick Log", "🏦 Liabilities", "🎯 Savings Goals",
-    "📈 Analytics", "🧠 Plan & Guidance", "📋 History",
+    "📊 Command Dashboard",
+    "⚡ Quick Entry Log",
+    "🏦 EMI & Liabilities",
+    "🎯 Savings & Wishlist",
+    "📈 Predictive Analytics",
+    "🧠 Local AI Guidance",
+    "📋 Passbook History",
 ])
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# TAB 1: DASHBOARD
+# TAB 1: COMMAND DASHBOARD
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 with tab_dash:
-    st.subheader("Cycle Overview")
+    dash_col_left, dash_col_right = st.columns([1.5, 1])
 
-    # Run-rate projection
-    projection = run_rate_projection(spent_this_cycle, cycle.day_index, cycle.total_days)
-    proj_col1, proj_col2, proj_col3 = st.columns(3)
-    proj_col1.metric("Daily Burn Rate", format_inr(projection["daily_rate"]))
-    proj_col2.metric("Projected Total Spend", format_inr(projection["projected_total"]))
-    on_track = projection["projected_total"] <= metrics.true_disposable
-    proj_col3.metric(
-        "Pace Status",
-        "✅ On Track" if on_track else "⚠️ Over-pace",
-        delta=f"{format_inr(metrics.true_disposable - projection['projected_total'])} headroom"
-        if on_track else f"{format_inr(projection['projected_total'] - metrics.true_disposable)} over",
-        delta_color="normal" if on_track else "inverse",
-    )
+    with dash_col_left:
+        st.markdown("#### ⚡ Run-Rate & Burn Velocity")
+        projection = run_rate_projection(spent_this_cycle, cycle.day_index, cycle.total_days)
+        on_track = projection["projected_total"] <= metrics.true_disposable
 
-    st.divider()
-
-    # Spending persona
-    persona = classify_spending_persona(PAYDAY)
-    if is_light:
-        persona_html = (
-            f'<div style="background:#ffffff;padding:12px 20px;border-radius:10px;border:1px solid #e2e8f0;'
-            f'box-shadow:0 1px 3px rgba(0,0,0,0.04);margin:8px 0;">'
-            f'<span style="font-size:1.5em">{persona["icon"]}</span> '
-            f'<strong style="color:#0f172a;font-size:1.1em">{persona["persona"]}</strong> '
-            f'<span style="color:#64748b"> — {persona["reason"]}</span></div>'
+        rr_col1, rr_col2, rr_col3 = st.columns(3)
+        rr_col1.metric("Current Burn Rate", f"{format_inr(projection['daily_rate'])} / day")
+        rr_col2.metric("Projected Total Outflow", format_inr(projection["projected_total"]))
+        rr_col3.metric(
+            "Pace Health",
+            "✅ On Track" if on_track else "⚠️ Over-Pace",
+            delta=f"{format_inr(metrics.true_disposable - projection['projected_total'])} headroom"
+            if on_track else f"{format_inr(projection['projected_total'] - metrics.true_disposable)} over budget",
+            delta_color="normal" if on_track else "inverse",
         )
-    else:
-        persona_html = (
-            f'<div style="background:#1e293b;padding:12px 20px;border-radius:10px;border:1px solid #334155;margin:8px 0;">'
-            f'<span style="font-size:1.5em">{persona["icon"]}</span> '
-            f'<strong style="color:#e2e8f0;font-size:1.1em">{persona["persona"]}</strong> '
-            f'<span style="color:#94a3b8"> — {persona["reason"]}</span></div>'
+
+        # Spending Persona Banner
+        persona = classify_spending_persona(PAYDAY)
+        persona_card_html = f"""
+        <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-radius: 12px; margin-top: 14px;
+                    background: {'#ffffff' if is_light else '#111827'};
+                    border: 1px solid {'#e2e8f0' if is_light else '#1f293d'};
+                    box-shadow: 0 1px 3px rgba(0,0,0,{'0.04' if is_light else '0.2'});">
+            <div style="font-size: 2rem;">{persona["icon"]}</div>
+            <div>
+                <div style="font-weight: 700; font-size: 1rem; color: {'#0f172a' if is_light else '#f8fafc'};">
+                    {persona["persona"]}
+                </div>
+                <div style="font-size: 0.85rem; color: {'#64748b' if is_light else '#94a3b8'};">
+                    {persona["reason"]}
+                </div>
+            </div>
+        </div>
+        """
+        st.markdown(persona_card_html, unsafe_allow_html=True)
+
+    with dash_col_right:
+        st.markdown("#### 📅 Today's Survival Pulse")
+        today_str = date.today().isoformat()
+        today_expenses = database.list_expenses(spent_on=today_str)
+        today_spent = sum((money(e["amount"]) for e in today_expenses), Decimal("0.00"))
+        status = derive_daily_status(metrics, today_spent)
+
+        today_col1, today_col2 = st.columns(2)
+        today_col1.metric("Spent Today", format_inr(status["spent"]))
+        today_col2.metric(
+            "Safe Ceiling Left",
+            format_inr(status["remaining"]),
+            delta="Within pace" if not status["over_budget"] else "Over daily ceiling",
+            delta_color="normal" if not status["over_budget"] else "inverse",
         )
-    st.markdown(persona_html, unsafe_allow_html=True)
 
-    # Today's spending summary
-    st.divider()
-    st.subheader("Today's Spending")
-    today_str = date.today().isoformat()
-    today_expenses = database.list_expenses(spent_on=today_str)
-    today_spent = sum((money(e["amount"]) for e in today_expenses), Decimal("0.00"))
-    status = derive_daily_status(metrics, today_spent)
+        if status["over_budget"]:
+            st.warning("⚠️ **Today's ceiling exceeded.** Carry no further discretionary spends until tomorrow to safeguard cycle runway.")
 
-    tc1, tc2, tc3 = st.columns(3)
-    tc1.metric("Spent Today", format_inr(status["spent"]))
-    tc2.metric("Safe Limit Today", format_inr(status["allowance"]))
-    tc3.metric("Remaining Today", format_inr(status["remaining"]))
+        if today_expenses:
+            imp_summary = daily_impulse_summary(today_expenses, metrics.safe_daily_limit)
+            if imp_summary["impulse_count"] > 0:
+                impulse_box_html = f"""
+                <div style="background: {'#fef3c7' if is_light else 'rgba(146, 64, 14, 0.25)'};
+                            border: 1px solid {'#fde68a' if is_light else '#92400e'};
+                            color: {'#92400e' if is_light else '#fbbf24'};
+                            padding: 10px 14px; border-radius: 10px; margin-top: 10px; font-size: 0.85rem;">
+                    ⚡ <strong>{imp_summary["impulse_count"]} unplanned spend(s) today</strong> ({format_inr(imp_summary["impulse_total"])}) 
+                    accounting for {imp_summary["impulse_percentage"]}% of today's total outflow.
+                </div>
+                """
+                st.markdown(impulse_box_html, unsafe_allow_html=True)
 
-    if status["over_budget"]:
-        st.warning("⚠️ You've exceeded today's safe limit. Avoid further discretionary spending.")
-
-    # Today's impulse summary
-    if today_expenses:
-        imp_summary = daily_impulse_summary(today_expenses, metrics.safe_daily_limit)
-        if imp_summary["impulse_count"] > 0:
-            if is_light:
-                impulse_html = (
-                    f'<div style="background:#fef3c7;padding:10px 16px;border-radius:8px;border:1px solid #fde68a;color:#92400e;">'
-                    f'⚡ {imp_summary["impulse_count"]} impulse spend(s) today '
-                    f'({format_inr(imp_summary["impulse_total"])}) — '
-                    f'{imp_summary["impulse_percentage"]}% of total</div>'
-                )
-            else:
-                impulse_html = (
-                    f'<div style="background:#431407;padding:10px 16px;border-radius:8px;border:1px solid #92400e;color:#fbbf24;">'
-                    f'⚡ {imp_summary["impulse_count"]} impulse spend(s) today '
-                    f'({format_inr(imp_summary["impulse_total"])}) — '
-                    f'{imp_summary["impulse_percentage"]}% of total</div>'
-                )
-            st.markdown(impulse_html, unsafe_allow_html=True)
-
-    # EMI status
-    st.divider()
-    st.subheader("EMI Status")
+    st.markdown("---")
+    st.markdown("#### 🏦 Pending EMIs & Liabilities This Cycle")
     pending_list = get_pending_emis_this_cycle(cycle.cycle_start.isoformat(), cycle.cycle_end.isoformat())
     if pending_list:
-        for lia in pending_list:
-            status_color = {
-                "PAID": "🟢", "UPCOMING": "🔵", "DUE": "🟡", "OVERDUE": "🔴"
-            }.get(lia["emi_status"], "⚪")
-            st.markdown(
-                f"{status_color} **{lia['name']}** — {format_inr(lia['emi_amount'])} "
-                f"(Due day {lia['due_day']}) — {lia['emi_status']}"
-            )
+        emi_cols = st.columns(min(3, len(pending_list)))
+        for idx, lia in enumerate(pending_list):
+            with emi_cols[idx % 3]:
+                status_icon = {"PAID": "🟢", "UPCOMING": "🔵", "DUE": "🟡", "OVERDUE": "🔴"}.get(lia["emi_status"], "⚪")
+                st.markdown(
+                    f"""
+                    <div style="background: {'#ffffff' if is_light else '#111827'}; border: 1px solid {'#e2e8f0' if is_light else '#1f293d'};
+                                border-radius: 12px; padding: 14px; margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-weight: 700; font-size: 0.95rem;">{lia['name']}</span>
+                            <span style="font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 6px;
+                                         background: {'#f1f5f9' if is_light else '#1e293b'}; color: {'#475569' if is_light else '#94a3b8'};">
+                                {status_icon} {lia['emi_status']}
+                            </span>
+                        </div>
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: {'#0284c7' if is_light else '#38bdf8'}; margin-bottom: 4px;">
+                            {format_inr(lia['emi_amount'])}
+                        </div>
+                        <div style="font-size: 0.8rem; color: {'#64748b' if is_light else '#94a3b8'};">
+                            Due Day {lia['due_day']} • {lia['tenure_remaining']} months left
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
     else:
-        st.caption("No active EMIs/liabilities.")
+        st.caption("No pending liabilities found for this cycle.")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# TAB 2: QUICK LOG
+# TAB 2: QUICK ENTRY LOG
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 with tab_log:
-    # Safe daily limit banner
-    if is_light:
-        safe_banner_html = (
-            f'<div style="background:#eff6ff;padding:12px 20px;border-radius:10px;border:1px solid #bfdbfe;'
-            f'text-align:center;margin-bottom:16px;box-shadow:0 1px 3px rgba(37,99,235,0.06);">'
-            f'<span style="color:#2563eb;font-size:0.85em;font-weight:600;">SAFE DAILY LIMIT</span><br>'
-            f'<span style="color:#1e3a8a;font-size:1.8em;font-weight:700;">{format_inr(metrics.safe_daily_limit)}</span>'
-            f'</div>'
-        )
-    else:
-        safe_banner_html = (
-            f'<div style="background:#0f172a;padding:12px 20px;border-radius:10px;border:1px solid #1e40af;'
-            f'text-align:center;margin-bottom:16px;">'
-            f'<span style="color:#60a5fa;font-size:0.85em;">SAFE DAILY LIMIT</span><br>'
-            f'<span style="color:#f1f5f9;font-size:1.8em;font-weight:700;">{format_inr(metrics.safe_daily_limit)}</span>'
-            f'</div>'
-        )
+    # Prominent Safe Limit Banner
+    safe_banner_html = f"""
+    <div style="background: {'linear-gradient(135deg, #eff6ff, #dbeafe)' if is_light else 'linear-gradient(135deg, #0f172a, #1e293b)'};
+                border: 1px solid {'#bfdbfe' if is_light else '#1e40af'};
+                padding: 16px 24px; border-radius: 14px; text-align: center; margin-bottom: 20px;
+                box-shadow: 0 4px 12px rgba(37, 99, 235, {'0.08' if is_light else '0.25'});">
+        <div style="font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+                    color: {'#2563eb' if is_light else '#60a5fa'}; margin-bottom: 4px;">
+            TODAY'S SAFE DISCRETIONARY CEILING
+        </div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 2.25rem; font-weight: 800;
+                    color: {'#1e3a8a' if is_light else '#f8fafc'};">
+            {format_inr(metrics.safe_daily_limit)}
+        </div>
+        <div style="font-size: 0.85rem; color: {'#475569' if is_light else '#94a3b8'}; margin-top: 4px;">
+            Paced across <strong>{cycle.days_remaining} remaining days</strong> after protecting bills, reserve, and EMIs.
+        </div>
+    </div>
+    """
     st.markdown(safe_banner_html, unsafe_allow_html=True)
 
     with st.form("quick_expense_form", clear_on_submit=True):
-        qc1, qc2 = st.columns(2)
-        amount = qc1.number_input("Amount (₹)", min_value=1.0, value=50.0, step=10.0, format="%.0f")
+        st.markdown("##### 📝 Record Instant Transaction")
 
-        # Category with groups
-        all_cats_flat = []
-        for group_name, items in CATEGORIES.items():
-            for item in items:
-                all_cats_flat.append(f"{item}")
-        category = qc2.selectbox("Category", all_cats_flat)
+        col_amt, col_cat = st.columns([1, 1.5])
+        with col_amt:
+            amount = st.number_input("Amount (₹)", min_value=1.0, value=50.0, step=10.0, format="%.0f")
 
-        qc3, qc4 = st.columns(2)
-        payment_mode = qc3.selectbox("Payment Mode", PAYMENT_MODES)
-        spend_date = qc4.date_input("Date", value=date.today())
+        with col_cat:
+            all_cats_flat = []
+            for group_name, items in CATEGORIES.items():
+                for item in items:
+                    all_cats_flat.append(item)
+            category = st.selectbox("Category Preset", all_cats_flat)
 
-        qc5, qc6 = st.columns(2)
-        is_planned = qc5.toggle("Was this planned?", value=True)
-        note = qc6.text_input("Note (optional)")
+        col_mode, col_date = st.columns(2)
+        with col_mode:
+            payment_mode = st.selectbox("Payment Mode", PAYMENT_MODES)
+        with col_date:
+            spend_date = st.date_input("Transaction Date", value=date.today())
 
-        submitted = st.form_submit_button("💾 Log Expense", type="primary", use_container_width=True)
+        col_plan, col_note = st.columns([1, 2])
+        with col_plan:
+            is_planned = st.toggle("Was this planned?", value=True, help="Uncheck if this was a spontaneous impulse buy")
+        with col_note:
+            note = st.text_input("Merchant / Memo", placeholder="e.g. Zepto midnight milk, Chai with friends…")
+
+        submitted = st.form_submit_button("⚡ Save Expense", type="primary", use_container_width=True)
 
     if submitted:
         hour_now = datetime.now().hour
-
-        # Impulse check before saving
-        impulse_result = check_impulse_flags(
-            amount, category, metrics.safe_daily_limit, hour_now
-        )
+        impulse_result = check_impulse_flags(amount, category, metrics.safe_daily_limit, hour_now)
 
         if impulse_result["needs_cooldown"]:
-            # Show cooldown warning
-            st.warning("🛑 **HIGH IMPULSE ALERT** — Review before confirming:")
+            st.warning("🛑 **HIGH IMPULSE VELOCITY TRIGGERED** — Cooldown activated:")
             for flag in impulse_result["flags"]:
                 st.markdown(f"  - ⚠️ {flag}")
-            st.markdown("*5-second review period...*")
+            st.markdown("*5-second intentional cooling period in progress...*")
 
-            # Store in session for delayed confirmation
             if "cooldown_pending" not in st.session_state:
                 st.session_state.cooldown_pending = {
                     "amount": amount, "category": category, "note": note,
@@ -453,7 +711,6 @@ with tab_log:
                     "time": time.time(),
                 }
         else:
-            # Save immediately
             if impulse_result["is_impulse"]:
                 for flag in impulse_result["flags"]:
                     st.info(f"💡 {flag}")
@@ -463,16 +720,16 @@ with tab_log:
                 note=note, spent_on=spend_date.isoformat(),
                 payment_mode=payment_mode, is_planned=is_planned, hour_logged=hour_now,
             )
-            st.success(f"Expense of {format_inr(amount)} logged to {category}!")
+            st.success(f"Expense of {format_inr(amount)} logged under {category}!")
             st.rerun()
 
-    # Handle cooldown confirmation
+    # Handle cooldown review
     if "cooldown_pending" in st.session_state:
         pending = st.session_state.cooldown_pending
         elapsed = time.time() - pending["time"]
         if elapsed >= 5:
-            col_confirm, col_cancel = st.columns(2)
-            with col_confirm:
+            c_conf, c_canc = st.columns(2)
+            with c_conf:
                 if st.button("✅ Confirm Anyway", type="primary", use_container_width=True):
                     database.add_expense(
                         plan_id=None, amount=money(pending["amount"]),
@@ -481,160 +738,154 @@ with tab_log:
                         is_planned=pending["is_planned"], hour_logged=pending["hour"],
                     )
                     del st.session_state.cooldown_pending
-                    st.success(f"Expense of {format_inr(pending['amount'])} logged (impulse flagged)!")
+                    st.success(f"Logged {format_inr(pending['amount'])} with impulse tag.")
                     st.rerun()
-            with col_cancel:
-                if st.button("❌ Cancel", use_container_width=True):
+            with c_canc:
+                if st.button("❌ Abort Purchase", use_container_width=True):
                     del st.session_state.cooldown_pending
-                    st.info("Impulse spend cancelled. Good save! 💪")
+                    st.info("Impulse purchase aborted. Wallet saved! 💪")
                     st.rerun()
         else:
             remaining_secs = int(5 - elapsed)
-            st.info(f"⏳ Review period: {remaining_secs}s remaining…")
+            st.info(f"⏳ Mindful pause: {remaining_secs}s remaining…")
             time.sleep(1)
             st.rerun()
 
-    # Today's log
-    st.divider()
-    st.subheader("Today's Expenses")
+    # Today's Transaction Ledger
+    st.markdown("---")
+    st.markdown("##### 📜 Today's Transactions")
     today_entries = database.list_expenses(spent_on=today_str)
     if today_entries:
-        formatted = [
+        formatted_list = [
             {
                 "Time": f"{e.get('hour_logged', 12)}:00",
                 "Category": e["category"],
-                "Mode": e.get("payment_mode", "UPI"),
-                "Planned": "✅" if e.get("is_planned", 1) else "⚡",
-                "Note": e["note"] or "",
+                "Payment": e.get("payment_mode", "UPI"),
+                "Type": "✅ Planned" if e.get("is_planned", 1) else "⚡ Impulse",
+                "Memo": e["note"] or "-",
                 "Amount": format_inr(e["amount"]),
             }
             for e in today_entries
         ]
-        st.dataframe(formatted, use_container_width=True, hide_index=True)
+        st.dataframe(formatted_list, use_container_width=True, hide_index=True)
 
-        delete_id = st.selectbox(
-            "Remove an expense", [None] + [e["id"] for e in today_entries],
-            format_func=lambda x: "Choose…" if x is None else f"Expense #{x}",
+        del_id = st.selectbox(
+            "Remove Incorrect Entry", [None] + [e["id"] for e in today_entries],
+            format_func=lambda x: "Select entry to remove…" if x is None else f"Transaction #{x}",
         )
-        if delete_id is not None and st.button("Delete selected expense"):
-            database.delete_expense(delete_id)
+        if del_id is not None and st.button("Delete Transaction", type="secondary"):
+            database.delete_expense(del_id)
             st.rerun()
     else:
-        st.caption("No expenses logged today.")
+        st.caption("No transactions recorded today yet.")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# TAB 3: LIABILITIES
+# TAB 3: LIABILITIES & BNPL MANAGER
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 with tab_lia:
-    st.subheader("EMI & Liability Manager")
-
-    # Total EMI burden
+    st.markdown("#### 🏦 Liability & Credit Pacing Manager")
     emi_total = total_monthly_emi_burden()
-    if emi_total > 0:
-        st.metric("Total Monthly EMI Burden", format_inr(emi_total))
 
-    # Active liabilities
+    lia_stat1, lia_stat2 = st.columns([1, 2])
+    lia_stat1.metric("Monthly EMI Burden", format_inr(emi_total))
+    lia_stat2.caption(
+        "Pending EMIs are automatically filtered out from your Available Balance to yield your **True Disposable Income**, "
+        "preventing the illusion of phantom cash."
+    )
+
     liabilities = database.list_liabilities(status="ACTIVE")
     if liabilities:
+        st.markdown("##### Active Debt & BNPL Obligations")
         for lia in liabilities:
-            with st.expander(f"{'🔴' if lia['type'] == 'BNPL' else '🏦'} {lia['name']} — {format_inr(lia['emi_amount'])}/month"):
-                lc1, lc2, lc3 = st.columns(3)
-                lc1.markdown(f"**Type:** {lia['type']}")
-                lc2.markdown(f"**Due Day:** {lia['due_day']}")
-                lc3.markdown(f"**Tenure Left:** {lia['tenure_remaining']} months")
+            with st.expander(f"{'⚡ BNPL: ' if lia['type'] == 'BNPL' else '🏦 EMI: '} {lia['name']} — {format_inr(lia['emi_amount'])}/mo"):
+                l_c1, l_c2, l_c3 = st.columns(3)
+                l_c1.markdown(f"**Facility Type:** `{lia['type']}`")
+                l_c2.markdown(f"**Monthly Due Day:** `Day {lia['due_day']}`")
+                l_c3.markdown(f"**Tenure Remaining:** `{lia['tenure_remaining']} months`")
 
                 if lia.get("principal") and fmoney(lia["principal"]) > 0:
-                    st.markdown(f"**Principal:** {format_inr(lia['principal'])} | **Rate:** {lia['interest_rate']}%")
+                    st.markdown(f"**Outstanding Principal:** {format_inr(lia['principal'])} • **Interest Rate:** {lia['interest_rate']}%")
 
-                if lia.get("note"):
-                    st.caption(lia["note"])
-
-                # Payment history
                 payments = database.list_liability_payments(lia["id"])
                 paid_this_cycle = any(
                     cycle.cycle_start.isoformat() <= p["paid_date"] <= cycle.cycle_end.isoformat()
                     for p in payments
                 )
 
-                if paid_this_cycle:
-                    st.success("✅ Paid this cycle")
-                else:
-                    if st.button(f"💸 Pay EMI ({format_inr(lia['emi_amount'])})", key=f"pay_emi_{lia['id']}"):
-                        pay_emi(lia["id"])
-                        st.success(f"EMI for {lia['name']} marked as paid!")
+                btn_col1, btn_col2 = st.columns([1.5, 1])
+                with btn_col1:
+                    if paid_this_cycle:
+                        st.success("✅ Fully paid for current cycle")
+                    else:
+                        if st.button(f"💸 Mark as Paid ({format_inr(lia['emi_amount'])})", key=f"pay_lia_{lia['id']}", type="primary"):
+                            pay_emi(lia["id"])
+                            st.success(f"Payment logged and deducted for {lia['name']}!")
+                            st.rerun()
+                with btn_col2:
+                    if st.button("🗑️ Delete Facility", key=f"del_lia_{lia['id']}"):
+                        database.delete_liability(lia["id"])
                         st.rerun()
-
-                if st.button("🗑️ Delete", key=f"del_lia_{lia['id']}"):
-                    database.delete_liability(lia["id"])
-                    st.rerun()
     else:
-        st.caption("No active liabilities. Add one below.")
+        st.caption("No active liabilities recorded. Great job keeping debt-free!")
 
-    # Add new liability
-    st.divider()
-    st.subheader("Add New Liability")
+    # Add Liability
+    st.markdown("---")
+    st.markdown("##### ➕ Register New Debt or Pay-Later Facility")
 
-    # Quick presets
-    preset_names = ["Custom"] + list(BNPL_PRESETS.keys())
-    selected_preset = st.selectbox("Quick Preset", preset_names)
+    preset_choice = st.selectbox("Instant Indian Credit Presets", ["Custom"] + list(BNPL_PRESETS.keys()))
+    with st.form("new_liability_form", clear_on_submit=True):
+        preset_data = BNPL_PRESETS.get(preset_choice, {})
+        nl_c1, nl_c2 = st.columns(2)
+        nl_name = nl_c1.text_input("Obligation Name", value=preset_choice if preset_choice != "Custom" else "")
+        nl_type = nl_c2.selectbox(
+            "Obligation Type", LIABILITY_TYPES,
+            index=LIABILITY_TYPES.index(preset_data.get("type", "EMI")) if preset_data.get("type") in LIABILITY_TYPES else 0
+        )
 
-    with st.form("add_liability_form", clear_on_submit=True):
-        preset = BNPL_PRESETS.get(selected_preset, {})
-        fc1, fc2 = st.columns(2)
-        lia_name = fc1.text_input("Name", value=selected_preset if selected_preset != "Custom" else "")
-        lia_type = fc2.selectbox("Type", LIABILITY_TYPES,
-                                  index=LIABILITY_TYPES.index(preset.get("type", "EMI")) if preset.get("type") in LIABILITY_TYPES else 0)
+        nl_c3, nl_c4, nl_c5 = st.columns(3)
+        nl_emi = nl_c3.number_input("Monthly Payment (₹)", min_value=0.0, step=100.0, format="%.0f")
+        nl_principal = nl_c4.number_input("Total Principal (₹)", min_value=0.0, step=1000.0, format="%.0f")
+        nl_tenure = nl_c5.number_input("Tenure (Months)", min_value=1, value=1 if preset_data.get("type") == "BNPL" else 12, step=1)
 
-        fc3, fc4, fc5 = st.columns(3)
-        lia_emi = fc3.number_input("EMI / Monthly Amount (₹)", min_value=0.0, step=100.0, format="%.0f")
-        lia_principal = fc4.number_input("Principal (₹)", min_value=0.0, step=1000.0, format="%.0f")
-        lia_tenure = fc5.number_input("Tenure (months)", min_value=1, value=1 if preset.get("type") == "BNPL" else 12, step=1)
+        nl_c6, nl_c7 = st.columns(2)
+        nl_due = nl_c6.number_input("Due Day of Month", min_value=1, max_value=28, value=1, step=1)
+        nl_rate = nl_c7.number_input("Interest Rate (%)", min_value=0.0, value=preset_data.get("interest_rate", 0.0), step=0.5, format="%.1f")
 
-        fc6, fc7 = st.columns(2)
-        lia_due_day = fc6.number_input("Due Day of Month", min_value=1, max_value=28, value=1, step=1)
-        lia_rate = fc7.number_input("Interest Rate (%)", min_value=0.0, value=preset.get("interest_rate", 0.0), step=0.5, format="%.1f")
+        nl_note = st.text_input("Memo / Account Ref", value=preset_data.get("note", ""))
 
-        lia_note = st.text_input("Note", value=preset.get("note", ""))
-
-        if st.form_submit_button("➕ Add Liability", use_container_width=True):
-            if lia_name and lia_emi > 0:
-                database.add_liability(
-                    lia_name, lia_type, lia_emi, lia_principal,
-                    lia_rate, lia_tenure, lia_due_day, lia_note,
-                )
-                st.success(f"Added {lia_name}!")
+        if st.form_submit_button("➕ Register Facility", type="primary", use_container_width=True):
+            if nl_name and nl_emi > 0:
+                database.add_liability(nl_name, nl_type, nl_emi, nl_principal, nl_rate, nl_tenure, nl_due, nl_note)
+                st.success(f"Facility '{nl_name}' registered successfully!")
                 st.rerun()
             else:
-                st.error("Name and EMI amount are required.")
-
-    # Completed liabilities
-    completed = database.list_liabilities(status="COMPLETED")
-    if completed:
-        with st.expander(f"Completed Liabilities ({len(completed)})"):
-            for c in completed:
-                st.markdown(f"✅ ~~{c['name']}~~ — {format_inr(c['emi_amount'])}/mo")
+                st.error("Facility name and monthly installment amount are mandatory.")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# TAB 4: SAVINGS GOALS
+# TAB 4: SAVINGS GOALS & WISHLIST
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 with tab_save:
-    st.subheader("Wishlist & Savings Targets")
+    st.markdown("#### 🎯 Wishlist & Time-Bound Savings Targets")
 
     goals = database.list_savings_goals(status="ACTIVE")
     median_surplus = get_median_monthly_surplus(PAYDAY)
     total_savings_needed = total_monthly_savings_needed()
 
     if total_savings_needed > 0:
-        sc1, sc2 = st.columns(2)
-        sc1.metric("Monthly Savings Needed", format_inr(total_savings_needed))
-        sc2.metric("Median Monthly Surplus", format_inr(median_surplus) if median_surplus > 0 else "No data yet")
+        sg_m1, sg_m2 = st.columns(2)
+        sg_m1.metric("Required Monthly Allocation", format_inr(total_savings_needed))
+        sg_m2.metric(
+            "Historical Median Monthly Surplus",
+            format_inr(median_surplus) if median_surplus > 0 else "Insufficient Data",
+            help="Computed as Inflows minus Outflows over recent cycles."
+        )
 
         if total_savings_needed > median_surplus and median_surplus > 0:
             st.warning(
-                f"⚠️ **High Feasibility Risk:** Savings quota ({format_inr(total_savings_needed)}/mo) "
-                f"exceeds your median surplus ({format_inr(median_surplus)}/mo). Consider extending deadlines."
+                f"⚠️ **High Feasibility Risk**: Your combined savings target ({format_inr(total_savings_needed)}/mo) "
+                f"exceeds your median cycle surplus ({format_inr(median_surplus)}/mo). Consider extending deadlines."
             )
 
     if goals:
@@ -642,128 +893,95 @@ with tab_save:
         checked_list = feasibility_check(progress_list, median_surplus)
 
         for gp in checked_list:
-            with st.expander(
-                f"{'🎯' if gp.is_feasible else '⚠️'} {gp.name} — "
-                f"{gp.milestone} ({format_inr(gp.current)} / {format_inr(gp.target)})"
-            ):
-                # Progress bar
-                st.progress(min(1.0, gp.pct / 100), text=f"{gp.pct}% complete")
+            feasibility_badge = "✅ Feasible" if gp.is_feasible else "⚠️ High Risk"
+            with st.expander(f"🎯 {gp.name} — {format_inr(gp.current)} of {format_inr(gp.target)} ({gp.milestone}) • {feasibility_badge}"):
+                st.progress(min(1.0, gp.pct / 100), text=f"{gp.pct}% achieved")
 
-                gc1, gc2, gc3 = st.columns(3)
-                gc1.metric("Remaining", format_inr(gp.remaining))
-                gc2.metric("Monthly Needed", format_inr(gp.monthly_needed))
-                gc3.metric("Months Left", str(gp.months_left))
+                g_c1, g_c2, g_c3 = st.columns(3)
+                g_c1.metric("Remaining Needed", format_inr(gp.remaining))
+                g_c2.metric("Monthly Quota", format_inr(gp.monthly_needed))
+                g_c3.metric("Months Remaining", str(gp.months_left))
 
-                if not gp.is_feasible:
-                    st.warning("This goal may not be feasible with current surplus. Consider extending the deadline.")
-
-                # Transfer funds
-                transfer_amt = st.number_input(
-                    f"Transfer to {gp.name} (₹)", min_value=0.0, step=100.0,
-                    format="%.0f", key=f"transfer_{gp.goal_id}",
-                )
-                if st.button(f"💸 Transfer", key=f"btn_transfer_{gp.goal_id}"):
-                    if transfer_amt > 0:
-                        transfer_to_goal(gp.goal_id, transfer_amt)
-                        st.success(f"{format_inr(transfer_amt)} transferred to {gp.name}!")
-                        st.rerun()
+                t_c1, t_c2 = st.columns([2, 1])
+                with t_c1:
+                    transfer_amt = st.number_input(
+                        f"Allocate Funds to {gp.name} (₹)", min_value=0.0, step=100.0,
+                        format="%.0f", key=f"alloc_{gp.goal_id}"
+                    )
+                with t_c2:
+                    st.write("")  # Alignment
+                    if st.button("💸 Transfer", key=f"btn_transfer_{gp.goal_id}", type="primary"):
+                        if transfer_amt > 0:
+                            transfer_to_goal(gp.goal_id, transfer_amt)
+                            st.success(f"Allocated {format_inr(transfer_amt)} to {gp.name}!")
+                            st.rerun()
 
                 if st.button("🗑️ Delete Goal", key=f"del_goal_{gp.goal_id}"):
                     database.delete_savings_goal(gp.goal_id)
                     st.rerun()
     else:
-        st.caption("No savings goals yet. Add one below to start tracking!")
+        st.caption("No savings targets registered yet. Add a target below!")
 
-    # Add new goal
-    st.divider()
-    st.subheader("Add New Goal")
+    # Add Goal
+    st.markdown("---")
+    st.markdown("##### ➕ Create New Target / Wishlist Goal")
     with st.form("add_goal_form", clear_on_submit=True):
-        gc1, gc2 = st.columns(2)
-        goal_name = gc1.text_input("Goal Name", placeholder="e.g., Headphones, Emergency Fund…")
-        goal_target = gc2.number_input("Target Amount (₹)", min_value=100.0, step=500.0, format="%.0f")
+        ag_c1, ag_c2 = st.columns(2)
+        g_name = ag_c1.text_input("Goal Name", placeholder="e.g. Sony XM5, Emergency 10k, Flight Tickets…")
+        g_target = ag_c2.number_input("Target Amount (₹)", min_value=100.0, step=500.0, format="%.0f")
 
-        gc3, gc4 = st.columns(2)
-        goal_deadline = gc3.date_input("Target Date", value=date(date.today().year, 12, 31))
-        goal_priority = gc4.number_input("Priority", min_value=1, max_value=5, value=1, help="1=highest")
+        ag_c3, ag_c4 = st.columns(2)
+        g_deadline = ag_c3.date_input("Target Date", value=date(date.today().year, 12, 31))
+        g_priority = ag_c4.number_input("Priority Level (1=Highest)", min_value=1, max_value=5, value=1)
 
-        if st.form_submit_button("🎯 Add Goal", use_container_width=True):
-            if goal_name and goal_target > 0:
-                database.add_savings_goal(goal_name, goal_target, goal_deadline.isoformat(), goal_priority)
-                st.success(f"Goal '{goal_name}' added!")
+        if st.form_submit_button("🎯 Save Savings Goal", type="primary", use_container_width=True):
+            if g_name and g_target > 0:
+                database.add_savings_goal(g_name, g_target, g_deadline.isoformat(), g_priority)
+                st.success(f"Goal '{g_name}' saved!")
                 st.rerun()
-            else:
-                st.error("Name and target amount are required.")
-
-    # Reached goals
-    reached = database.list_savings_goals(status="REACHED")
-    if reached:
-        with st.expander(f"🏆 Reached Goals ({len(reached)})"):
-            for r in reached:
-                st.markdown(f"🏆 **{r['name']}** — {format_inr(r['target_amount'])} achieved!")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# TAB 5: ANALYTICS
+# TAB 5: PREDICTIVE ANALYTICS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 with tab_analytics:
-    st.subheader("Historical Analysis & Insights")
+    st.markdown("#### 📈 Historical Delta & Predictive Intelligence")
 
-    # Month-over-month delta
-    st.markdown("#### Category Comparison (vs. Previous Cycle)")
     deltas = mom_category_delta(cycle, PAYDAY)
     surges: list[str] = []
-    if deltas:
-        delta_display = [
-            {
-                "": d["direction"],
-                "Category": d["category"],
-                "This Cycle": format_inr(d["current"]),
-                "Last Cycle": format_inr(d["previous"]),
-                "Change": f"{d['delta_pct']:+.1f}%",
-            }
-            for d in deltas[:15]  # Top 15
-        ]
-        st.dataframe(delta_display, use_container_width=True, hide_index=True)
 
-        # Surge alerts
+    if deltas:
+        st.markdown("##### Category Outflow Delta (vs Previous Cycle Same Day-Index)")
+        delta_table = [
+            {
+                "Direction": d["direction"],
+                "Category": d["category"],
+                "Current Cycle": format_inr(d["current"]),
+                "Previous Cycle": format_inr(d["previous"]),
+                "Variance": f"{d['delta_pct']:+.1f}%",
+            }
+            for d in deltas[:15]
+        ]
+        st.dataframe(delta_table, use_container_width=True, hide_index=True)
+
         surges = category_surges(deltas)
         if surges:
-            st.markdown("#### 🚨 Category Surges")
+            st.markdown("##### 🚨 Active Category Surge Warnings")
             for s in surges:
-                st.markdown(f"- ⚠️ {s}")
+                st.warning(f"⚠️ {s}")
     else:
-        st.caption("Not enough data for comparison yet. Keep logging expenses!")
+        st.caption("Insufficient historical data for cycle comparison. Keep logging transactions.")
 
-    st.divider()
-
-    # Run-rate projection detail
-    st.markdown("#### Run-Rate Projection")
-    st.markdown(
-        f"At your current pace of **{format_inr(projection['daily_rate'])}/day**, "
-        f"you'll spend **{format_inr(projection['projected_total'])}** by end of cycle "
-        f"(disposable budget: **{format_inr(metrics.true_disposable)}**)."
-    )
-
-    st.divider()
-
-    # Contextual habit tips
-    st.markdown("#### 💡 Smart Saving Tips")
+    st.markdown("---")
+    st.markdown("##### 💡 Contextual Habit Tips Linked to Goals")
     goal_list = database.list_savings_goals(status="ACTIVE")
-    tips = generate_habit_tips(
-        surges,
-        goal_list,
-        projection["daily_rate"],
-    )
+    tips = generate_habit_tips(surges, goal_list, projection["daily_rate"])
     for tip in tips:
-        st.markdown(f"- 💡 {tip}")
+        st.info(f"💡 {tip}")
 
-    st.divider()
-
-    # Cycle spending breakdown
-    st.markdown("#### Spending by Category (This Cycle)")
-    cycle_expenses = database.list_expenses_range(
-        cycle.cycle_start.isoformat(), cycle.cycle_end.isoformat()
-    )
+    st.markdown("---")
+    st.markdown("##### 📊 Active Cycle Category Breakdown")
+    cycle_expenses = database.list_expenses_range(cycle.cycle_start.isoformat(), cycle.cycle_end.isoformat())
     if cycle_expenses:
         from collections import defaultdict as dd
         cat_totals = dd(Decimal)
@@ -771,19 +989,25 @@ with tab_analytics:
             cat_totals[e["category"]] += money(e["amount"])
         sorted_cats = sorted(cat_totals.items(), key=lambda x: x[1], reverse=True)
         cat_display = [
-            {"Category": cat, "Amount": format_inr(amt), "% of Total": f"{float(amt / spent_this_cycle * 100):.1f}%"}
+            {
+                "Category": cat,
+                "Total Spent": format_inr(amt),
+                "Share of Cycle": f"{float((amt / spent_this_cycle) * 100):.1f}%" if spent_this_cycle > 0 else "0%",
+            }
             for cat, amt in sorted_cats
-        ] if spent_this_cycle > 0 else []
-        if cat_display:
-            st.dataframe(cat_display, use_container_width=True, hide_index=True)
+        ]
+        st.dataframe(cat_display, use_container_width=True, hide_index=True)
     else:
-        st.caption("No expenses this cycle yet.")
+        st.caption("No expenses recorded in the current active cycle.")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# TAB 6: PLAN & GUIDANCE
+# TAB 6: LOCAL AI GUIDANCE
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 with tab_plan:
+    st.markdown("#### 🧠 Sovereign AI Financial Guidance")
+    st.caption("Powered entirely by on-device local LLM execution via Ollama (zero cloud telemetry, 100% private).")
+
     can_generate = metrics.feasible and metrics.usable_pool > 0
 
     if "advice" not in st.session_state:
@@ -791,13 +1015,12 @@ with tab_plan:
         st.session_state.advice_source = "static"
 
     if st.button(
-        "Generate Financial Guidance", type="primary",
+        "🧠 Synthesize Personalized Guidance", type="primary",
         disabled=not can_generate,
-        help=None if can_generate else "A positive usable budget is required",
+        help=None if can_generate else "A positive usable balance is required.",
     ):
-        with st.spinner("Analyzing your budget and preparing personalized guidance..."):
+        with st.spinner("Analyzing budget heuristics and generating sovereign advice..."):
             try:
-                # Build extended context
                 cycle_ctx = f"Day {cycle.day_index}/{cycle.total_days}, {cycle.days_remaining} days left"
                 lia_ctx = f"Pending EMIs: {format_inr(pending_emis)}" if pending_emis > 0 else None
                 savings_ctx = f"Monthly savings needed: {format_inr(total_savings_needed)}" if total_savings_needed > 0 else None
@@ -826,8 +1049,7 @@ with tab_plan:
         st.info("Displaying standard survival framework based on your numbers.")
 
     advice = st.session_state.advice
-    st.subheader("Practical Guidance")
-    st.write(advice.get("summary", STATIC_GUIDE["summary"]))
+    st.markdown(f"**Executive Synthesis:** {advice.get('summary', STATIC_GUIDE['summary'])}")
 
     sections = [
         ("🍳 Meal Framework", "meal_plan"),
@@ -847,79 +1069,74 @@ with tab_plan:
             else:
                 st.write(items)
 
-    if st.button("💾 Save Current Plan", disabled=not can_generate):
+    if st.button("💾 Save Survival Plan to Local DB", disabled=not can_generate):
         plan_id = database.save_plan(plan_name, metrics, json.dumps(advice, ensure_ascii=False))
-        st.success(f"Plan saved locally (#{plan_id}).")
+        st.success(f"Survival plan archived locally (#{plan_id}).")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# TAB 7: HISTORY
+# TAB 7: PASSBOOK HISTORY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 with tab_history:
-    hist_tab_plans, hist_tab_expenses, hist_tab_inflows = st.tabs(["Saved Plans", "All Expenses", "Inflow History"])
+    hist_plans_tab, hist_exp_tab, hist_inflows_tab = st.tabs(["Archived Plans", "All Cycle Expenses", "Inflow Log"])
 
-    with hist_tab_plans:
+    with hist_plans_tab:
         plans = database.list_plans()
         if not plans:
-            st.caption("No saved plans yet.")
+            st.caption("No archived survival plans.")
         else:
             for plan in plans:
-                with st.expander(
-                    f"{plan['name']} · {plan['days']} days · {format_inr(plan['daily_allowance'])}/day"
-                ):
-                    st.caption(
-                        f"Saved {plan['created_at']} · Total {format_inr(plan['total_money'])} "
-                        f"· Bills {format_inr(plan['fixed_expenses'])} · Reserve {format_inr(plan['reserve'])}"
-                    )
+                with st.expander(f"{plan['name']} • {plan['days']} Days • {format_inr(plan['daily_allowance'])}/day"):
+                    st.caption(f"Archived {plan['created_at']} • Available: {format_inr(plan['total_money'])} • Bills: {format_inr(plan['fixed_expenses'])} • Reserve: {format_inr(plan['reserve'])}")
                     try:
                         st.json(json.loads(plan["advice_json"]))
                     except json.JSONDecodeError:
                         st.text(plan["advice_json"])
-                    if st.button("Delete plan", key=f"delete_plan_{plan['id']}"):
+                    if st.button("Delete Plan", key=f"del_plan_{plan['id']}"):
                         database.delete_plan(plan["id"])
                         st.rerun()
 
-    with hist_tab_expenses:
-        all_expenses = database.list_expenses_range(
-            cycle.cycle_start.isoformat(), cycle.cycle_end.isoformat()
-        )
+    with hist_exp_tab:
+        all_expenses = database.list_expenses_range(cycle.cycle_start.isoformat(), cycle.cycle_end.isoformat())
         if all_expenses:
             exp_display = [
                 {
                     "Date": e["spent_on"],
                     "Category": e["category"],
-                    "Mode": e.get("payment_mode", "UPI"),
-                    "Planned": "✅" if e.get("is_planned", 1) else "⚡",
-                    "Note": e["note"] or "",
+                    "Payment Mode": e.get("payment_mode", "UPI"),
+                    "Type": "✅ Planned" if e.get("is_planned", 1) else "⚡ Impulse",
+                    "Memo": e["note"] or "-",
                     "Amount": format_inr(e["amount"]),
                 }
                 for e in all_expenses
             ]
             st.dataframe(exp_display, use_container_width=True, hide_index=True)
-            st.caption(f"Showing {len(all_expenses)} expenses this cycle ({cycle.cycle_start} to {cycle.cycle_end})")
+            st.caption(f"Displaying {len(all_expenses)} transactions in active cycle.")
         else:
-            st.caption("No expenses this cycle.")
+            st.caption("No transactions found in this cycle.")
 
-    with hist_tab_inflows:
-        inflows = database.list_inflows(limit=20)
+    with hist_inflows_tab:
+        inflows = database.list_inflows(limit=25)
         if inflows:
             inflow_display = [
                 {
                     "Date": i["date"],
-                    "Type": INFLOW_LABELS.get(i["type"], i["type"]),
+                    "Stream Type": INFLOW_LABELS.get(i["type"], i["type"]),
                     "Amount": format_inr(i["amount"]),
-                    "Note": i.get("note", ""),
+                    "Memo": i.get("note", "-"),
                 }
                 for i in inflows
             ]
             st.dataframe(inflow_display, use_container_width=True, hide_index=True)
         else:
-            st.caption("No inflows logged yet.")
+            st.caption("No inflows recorded yet.")
 
-# ─── Footer ──────────────────────────────────────────────────────────────────
+# ─── Footer ───────────────────────────────────────────────────────────────────
 
-st.divider()
-st.caption(
-    "🔒 100% Private & Offline: All financial records stay securely on your local device. "
-    "No external APIs or data tracking."
-)
+st.markdown("---")
+footer_html = f"""
+<div style="text-align: center; font-size: 0.8rem; color: {'#64748b' if is_light else '#94a3b8'}; padding: 12px 0;">
+    🔒 <strong>100% Private, Air-Gapped & Sovereign</strong> • All financial computations and records remain strictly on your local device.
+</div>
+"""
+st.markdown(footer_html, unsafe_allow_html=True)
