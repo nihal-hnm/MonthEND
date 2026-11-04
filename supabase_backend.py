@@ -206,6 +206,49 @@ def test_connection() -> tuple[bool, str, dict[str, Any]]:
         }
 
 
+# ─── Authentication ──────────────────────────────────────────────────────────
+
+def sign_in_user(email: str, password: str) -> dict[str, Any]:
+    """Authenticate user with email and password via Supabase Auth."""
+    client = get_client()
+    if client is None:
+        return {"success": False, "error": "Supabase client not configured"}
+    try:
+        res = client.auth.sign_in_with_password({"email": email, "password": password})
+        if getattr(res, "user", None):
+            session = getattr(res, "session", None)
+            return {
+                "success": True,
+                "user": {"id": res.user.id, "email": res.user.email},
+                "token": session.access_token if session else "",
+            }
+        return {"success": False, "error": "Invalid email or password"}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
+def sign_up_user(email: str, password: str, metadata: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    """Register new user with email and password via Supabase Auth."""
+    client = get_client()
+    if client is None:
+        return {"success": False, "error": "Supabase client not configured"}
+    try:
+        credentials: dict[str, Any] = {"email": email, "password": password}
+        if metadata:
+            credentials["options"] = {"data": metadata}
+        res = client.auth.sign_up(credentials)
+        if getattr(res, "user", None):
+            session = getattr(res, "session", None)
+            return {
+                "success": True,
+                "user": {"id": res.user.id, "email": res.user.email},
+                "token": session.access_token if session else "",
+            }
+        return {"success": False, "error": "Registration failed"}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
 # ─── Settings ─────────────────────────────────────────────────────────────────
 
 def get_settings() -> dict[str, Any]:

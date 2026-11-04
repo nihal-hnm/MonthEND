@@ -210,10 +210,15 @@
       <span class="brand-title">MonthEnd</span>
       <span class="brand-subtitle">Budget & Expense Tracker</span>
     </div>
-    <div class="cycle-badge">
-      <span id="cycle-label">Cycle status</span>
-      <div class="cycle-bar-wrap">
-        <div class="cycle-bar-fill" id="cycle-bar" style="width: 0%;"></div>
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div class="cycle-badge">
+        <span id="cycle-label">Cycle status</span>
+        <div class="cycle-bar-wrap">
+          <div class="cycle-bar-fill" id="cycle-bar" style="width: 0%;"></div>
+        </div>
+      </div>
+      <div id="auth-header-btn">
+        <a href="/login" class="btn btn-sm" style="text-decoration: none;">Sign In</a>
       </div>
     </div>
   </header>
@@ -827,7 +832,30 @@
       await loadDashboard();
     }
 
+    function checkAuthStatus() {
+      const user = JSON.parse(localStorage.getItem('monthend_user') || 'null');
+      const authContainer = document.getElementById('auth-header-btn');
+      if (!authContainer) return;
+      if (user && user.email) {
+        authContainer.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 12px; color: var(--text-muted);">${user.email}</span>
+            <button onclick="handleLogout()" class="btn btn-sm" style="padding: 3px 8px; font-size: 11px;">Logout</button>
+          </div>
+        `;
+      } else {
+        authContainer.innerHTML = `<a href="/login" class="btn btn-sm" style="text-decoration: none;">Sign In</a>`;
+      }
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('monthend_user');
+      fetch('/api/auth/logout', { method: 'POST' });
+      location.reload();
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
+      checkAuthStatus();
       loadDashboard();
       document.getElementById("inflow-date").valueAsDate = new Date();
     });

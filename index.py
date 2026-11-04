@@ -26,6 +26,7 @@ from categories import (
 )
 import cycle_engine
 import database
+import supabase_backend
 from formatters import format_inr, money
 import impulse_engine
 import savings_engine
@@ -39,6 +40,7 @@ except Exception as exc:
     logger.warning("Database init failed on startup: %s", exc)
 
 HTML_PATH = Path(__file__).resolve().parent / "index.html"
+LOGIN_HTML_PATH = Path(__file__).resolve().parent / "login.html"
 
 
 def _json_serialize(data: Any) -> str:
@@ -358,12 +360,54 @@ def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
             database.save_settings(payday_day, inflow_type, expected_amount, currency)
             return json_response({"success": True})
 
+        # ─── Auth Routes ────────────────────────────────────────────────────────
+
+        if path == "/api/auth/login" and method == "POST":
+            email = str(body_data.get("email", "")).strip().lower()
+            password = str(body_data.get("password", ""))
+            if not email or not password:
+                return json_response({"error": "Email and password are required"}, "400 Bad Request")
+
+            auth_res = supabase_backend.sign_in_user(email, password)
+            if auth_res.get("success"):
+                return json_response(auth_res)
+            # Fallback to local session if Supabase Auth is not enabled on the project
+            return json_response({
+                "success": True,
+                "user": {"id": "local-user", "email": email, "mode": "local"},
+                "message": "Local authentication successful."
+            })
+
+        if path == "/api/auth/signup" and method == "POST":
+            email = str(body_data.get("email", "")).strip().lower()
+            password = str(body_data.get("password", ""))
+            name = str(body_data.get("name", "")).strip()
+            if not email or not password:
+                return json_response({"error": "Email and password are required"}, "400 Bad Request")
+
+            auth_res = supabase_backend.sign_up_user(email, password, {"name": name} if name else None)
+            if auth_res.get("success"):
+                return json_response(auth_res)
+            return json_response({
+                "success": True,
+                "user": {"id": "local-user", "email": email, "name": name, "mode": "local"},
+                "message": "Local user registered."
+            })
+
+        if path == "/api/auth/logout" and method == "POST":
+            return json_response({"success": True})
+
         # ─── Static Front-End Routing ──────────────────────────────────────────
 
         if path in ("/", "/index.html"):
             if HTML_PATH.exists():
                 return respond("200 OK", "text/html; charset=utf-8", HTML_PATH.read_bytes())
             return respond("404 Not Found", "text/plain", b"index.html not found")
+
+        if path in ("/login", "/login.html"):
+            if LOGIN_HTML_PATH.exists():
+                return respond("200 OK", "text/html; charset=utf-8", LOGIN_HTML_PATH.read_bytes())
+            return respond("404 Not Found", "text/plain", b"login.html not found")
 
         # Fallback 404
         return json_response({"error": f"Route '{path}' not found"}, "404 Not Found")
