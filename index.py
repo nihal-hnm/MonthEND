@@ -6,10 +6,13 @@ Self-contained WSGI web server providing both:
 """
 from __future__ import annotations
 
+import io
 import json
 import logging
+import urllib.parse
 from datetime import date, datetime
 from decimal import Decimal
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs
@@ -42,6 +45,21 @@ except Exception as exc:
 
 HTML_PATH = Path(__file__).resolve().parent / "index.html"
 LOGIN_HTML_PATH = Path(__file__).resolve().parent / "login.html"
+
+
+def _read_html_file(filename: str) -> bytes | None:
+    candidates = [
+        Path(__file__).resolve().parent / filename,
+        Path.cwd() / filename,
+        Path(filename),
+    ]
+    for p in candidates:
+        if p.is_file():
+            try:
+                return p.read_bytes()
+            except Exception:
+                continue
+    return None
 
 
 def _json_serialize(data: Any) -> str:
@@ -430,13 +448,15 @@ def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
         # ─── Static Front-End Routing ──────────────────────────────────────────
 
         if path in ("/", "/index.html"):
-            if HTML_PATH.exists():
-                return respond("200 OK", "text/html; charset=utf-8", HTML_PATH.read_bytes())
+            content = _read_html_file("index.html")
+            if content:
+                return respond("200 OK", "text/html; charset=utf-8", content)
             return respond("404 Not Found", "text/plain", b"index.html not found")
 
         if path in ("/login", "/login.html"):
-            if LOGIN_HTML_PATH.exists():
-                return respond("200 OK", "text/html; charset=utf-8", LOGIN_HTML_PATH.read_bytes())
+            content = _read_html_file("login.html")
+            if content:
+                return respond("200 OK", "text/html; charset=utf-8", content)
             return respond("404 Not Found", "text/plain", b"login.html not found")
 
         # Fallback 404
@@ -447,9 +467,82 @@ def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
         return json_response({"error": str(exc)}, "500 Internal Server Error")
 
 
-# Common handler aliases for Vercel
+# WSGI application alias
 application = app
-handler = app
+
+
+class handler(BaseHTTPRequestHandler):
+    """Native BaseHTTPRequestHandler class required by Vercel Python Runtime."""
+
+    def do_GET(self) -> None:
+        self._dispatch("GET")
+
+    def do_POST(self) -> None:
+        self._dispatch("POST")
+
+    def do_DELETE(self) -> None:
+        self._dispatch("DELETE")
+
+    def do_PUT(self) -> None:
+        self._dispatch("PUT")
+
+    def do_PATCH(self) -> None:
+        self._dispatch("PATCH")
+
+    def do_OPTIONS(self) -> None:
+        self._dispatch("OPTIONS")
+
+    def _dispatch(self, method: str) -> None:
+        content_len = int(self.headers.get("Content-Length", 0) or 0)
+        body = self.rfile.read(content_len) if content_len > 0 else b""
+
+        parsed_url = urllib.parse.urlparse(self.path)
+        environ = {
+            "REQUEST_METHOD": method,
+            "PATH_INFO": parsed_url.path,
+            "QUERY_STRING": parsed_url.query,
+            "SERVER_NAME": "localhost",
+            "SERVER_PORT": "80",
+            "wsgi.url_scheme": "https",
+            "wsgi.input": io.BytesIO(body),
+            "wsgi.errors": io.StringIO(),
+            "wsgi.version": (1, 0),
+            "wsgi.multithread": False,
+            "wsgi.multiprocess": False,
+            "wsgi.run_once": False,
+            "CONTENT_LENGTH": str(content_len),
+            "CONTENT_TYPE": self.headers.get("Content-Type", ""),
+        }
+        for k, v in self.headers.items():
+            environ[f"HTTP_{k.upper().replace('-', '_')}"] = v
+
+        resp_status = "200 OK"
+        resp_headers: list[tuple[str, str]] = []
+
+        def start_response(status: str, headers: list[tuple[str, str]], exc_info: Any = None) -> None:
+            nonlocal resp_status, resp_headers
+            resp_status = status
+            resp_headers = headers
+
+        try:
+            chunks = app(environ, start_response)
+            code = int(resp_status.split()[0])
+            self.send_response(code)
+            for h_name, h_val in resp_headers:
+                self.send_header(h_name, h_val)
+            self.end_headers()
+            for chunk in chunks:
+                self.wfile.write(chunk)
+        except Exception as exc:
+            logger.exception("Error in handler dispatch: %s", exc)
+            self.send_response(500)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": str(exc)}).encode("utf-8"))
+
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
 
 if __name__ == "__main__":
     from wsgiref.simple_server import make_server

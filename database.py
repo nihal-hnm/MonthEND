@@ -15,7 +15,13 @@ import supabase_backend
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path("/tmp/survival_budget.db") if os.environ.get("VERCEL") else Path(__file__).with_name("survival_budget.db")
+
+def _is_serverless() -> bool:
+    """Detect if running in a serverless environment (Vercel, AWS Lambda)."""
+    return any(k in os.environ for k in ("VERCEL", "VERCEL_ENV", "VERCEL_REGION", "AWS_LAMBDA_FUNCTION_NAME", "LAMBDA_TASK_ROOT"))
+
+
+DB_PATH = Path("/tmp/survival_budget.db") if _is_serverless() else Path(__file__).with_name("survival_budget.db")
 
 
 # ─── Backend Selection ────────────────────────────────────────────────────────
@@ -95,8 +101,13 @@ def sync_sqlite_to_supabase() -> dict[str, int]:
 # ─── Local SQLite Connection ──────────────────────────────────────────────────
 
 @contextmanager
-def _connection(db_path=DB_PATH):
-    conn = sqlite3.connect(db_path, timeout=10)
+def _connection(db_path=None):
+    target = Path(db_path or DB_PATH)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    conn = sqlite3.connect(str(target), timeout=10)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA foreign_keys = ON")

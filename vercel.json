@@ -1,4 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "functions": {
+    "index.py": {
+      "includeFiles": "{index.html,login.html}"
+    }
+  }
 }
