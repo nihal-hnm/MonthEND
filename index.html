@@ -5,31 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MonthEnd — Personal Budget Tracker</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+
     :root {
-      --bg: #090d16;
-      --card-bg: #101623;
-      --card-border: #1e293b;
-      --card-hover: #172033;
+      --bg: #070a12;
+      --bg-surface: #0c111d;
+      --card-bg: rgba(15, 23, 42, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-border-hover: rgba(255, 255, 255, 0.18);
+      --input-bg: rgba(15, 23, 42, 0.85);
+      --input-border: rgba(255, 255, 255, 0.12);
+      
       --emerald: #10b981;
       --emerald-light: #34d399;
+      --emerald-surface: rgba(16, 185, 129, 0.12);
+      --emerald-border: rgba(16, 185, 129, 0.28);
+      
+      --sky: #38bdf8;
+      --sky-light: #7dd3fc;
+      --sky-surface: rgba(56, 189, 248, 0.12);
+      --sky-border: rgba(56, 189, 248, 0.28);
+      
       --amber: #f59e0b;
-      --rose: #ef4444;
+      --amber-light: #fbbf24;
+      --amber-surface: rgba(245, 158, 11, 0.12);
+      --amber-border: rgba(245, 158, 11, 0.28);
+      
+      --rose: #f43f5e;
+      --rose-light: #fb7185;
+      --rose-surface: rgba(244, 63, 94, 0.12);
+      --rose-border: rgba(244, 63, 94, 0.28);
+      
+      --indigo: #818cf8;
+      --indigo-surface: rgba(129, 140, 248, 0.12);
+      --indigo-border: rgba(129, 140, 248, 0.28);
+
       --text: #f8fafc;
       --text-muted: #94a3b8;
       --text-dim: #64748b;
-      --accent: #3b82f6;
     }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    
     body {
-      background-color: var(--bg);
+      background: radial-gradient(circle at 50% -10%, rgba(16, 185, 129, 0.1) 0%, rgba(15, 23, 42, 0.5) 40%, #070a12 80%), #070a12;
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      -webkit-font-smoothing: antialiased;
     }
+
     header {
-      background: #0d131f;
+      background: rgba(11, 17, 29, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--card-border);
       padding: 14px 28px;
       display: flex;
@@ -38,32 +69,51 @@
       position: sticky;
       top: 0;
       z-index: 50;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
     }
-    .brand-wrap { display: flex; align-items: center; gap: 10px; }
-    .brand-title { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; color: #ffffff; }
-    .brand-subtitle { font-size: 13px; color: var(--text-dim); }
+    .brand-wrap { display: flex; align-items: center; gap: 12px; }
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(14, 165, 233, 0.15));
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--emerald-light);
+      font-weight: 800;
+      font-size: 17px;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    .brand-title { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; color: #ffffff; }
+    .brand-subtitle { font-size: 12px; color: var(--text-dim); }
     .cycle-badge {
       display: flex;
       align-items: center;
       gap: 12px;
-      background: var(--card-bg);
+      background: rgba(15, 23, 42, 0.7);
       border: 1px solid var(--card-border);
       padding: 6px 14px;
-      border-radius: 6px;
-      font-size: 13px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #cbd5e1;
     }
-    .cycle-bar-wrap { width: 90px; height: 6px; background: #334155; border-radius: 3px; overflow: hidden; }
-    .cycle-bar-fill { height: 100%; background: var(--emerald); border-radius: 3px; transition: width 0.3s; }
+    .cycle-bar-wrap { width: 90px; height: 6px; background: rgba(51, 65, 85, 0.7); border-radius: 9999px; overflow: hidden; }
+    .cycle-bar-fill { height: 100%; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 9999px; transition: width 0.3s ease; box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
+    
     main {
       flex: 1;
       max-width: 1200px;
       width: 100%;
       margin: 0 auto;
-      padding: 28px 24px;
+      padding: 30px 24px;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 26px;
     }
+
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -71,37 +121,102 @@
     }
     .kpi-card {
       background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       border: 1px solid var(--card-border);
-      border-radius: 8px;
+      border-radius: 12px;
       padding: 18px 20px;
       display: flex;
       flex-direction: column;
       gap: 6px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .kpi-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
-    .kpi-value { font-size: 26px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px; }
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--card-border-hover);
+      box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: transparent;
+      transition: height 0.2s ease;
+    }
+    .kpi-card:hover::before { height: 3px; }
+    .kpi-card-sky::before { background: linear-gradient(90deg, #0284c7, #38bdf8); }
+    .kpi-card-emerald::before { background: linear-gradient(90deg, #059669, #10b981); }
+    .kpi-card-amber::before { background: linear-gradient(90deg, #d97706, #f59e0b); }
+    .kpi-card-mint::before { background: linear-gradient(90deg, #059669, #6ee7b7); }
+    .kpi-card-indigo::before { background: linear-gradient(90deg, #4f46e5, #818cf8); }
+    .kpi-card-rose::before { background: linear-gradient(90deg, #e11d48, #f43f5e); }
+
+    .kpi-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .kpi-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
+    .kpi-icon-pill {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .kpi-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 26px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+      font-variant-numeric: tabular-nums;
+    }
     .kpi-sub { font-size: 12px; color: var(--text-dim); }
 
     .nav-tabs {
       display: flex;
-      gap: 4px;
-      border-bottom: 1px solid var(--card-border);
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 5px;
       overflow-x: auto;
+      scrollbar-width: none;
     }
+    .nav-tabs::-webkit-scrollbar { display: none; }
     .tab-btn {
       background: transparent;
-      border: none;
+      border: 1px solid transparent;
       color: var(--text-muted);
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
-      padding: 10px 16px;
-      border-bottom: 2px solid transparent;
+      padding: 9px 18px;
+      border-radius: 8px;
       cursor: pointer;
       white-space: nowrap;
-      transition: all 0.2s;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .tab-btn:hover { color: #ffffff; }
-    .tab-btn.active { color: #ffffff; border-bottom-color: var(--emerald); font-weight: 600; }
+    .tab-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .tab-btn.active {
+      color: var(--emerald-light);
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.3);
+      font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
 
     .tab-content { display: none; }
     .tab-content.active { display: block; }
@@ -114,136 +229,206 @@
     @media (max-width: 800px) {
       .grid-2 { grid-template-columns: 1fr; }
     }
+    
     .panel {
       background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 20px;
+      border-radius: 14px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      transition: border-color 0.2s;
     }
+    .panel:hover { border-color: var(--card-border-hover); }
     .panel-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid var(--card-border);
-      padding-bottom: 12px;
+      padding-bottom: 14px;
     }
-    .panel-title { font-size: 15px; font-weight: 600; color: #ffffff; }
+    .panel-title { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; color: #ffffff; }
 
-    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-    .form-label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .form-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
     .form-input, .form-select {
-      background: #172033;
-      border: 1px solid var(--card-border);
-      border-radius: 6px;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 9px;
       color: #ffffff;
-      padding: 9px 12px;
-      font-size: 14px;
+      padding: 10px 14px;
+      font-size: 13.5px;
+      font-family: inherit;
       outline: none;
-      transition: border-color 0.2s;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
     }
-    .form-input:focus, .form-select:focus { border-color: var(--emerald); }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-input::placeholder { color: var(--text-dim); }
+    .form-input:focus, .form-select:focus {
+      border-color: var(--emerald);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2), inset 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
     .btn {
-      background: #1e293b;
-      border: 1px solid #334155;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       color: #ffffff;
-      padding: 9px 16px;
-      border-radius: 6px;
+      padding: 10px 18px;
+      border-radius: 9px;
       font-size: 13px;
-      font-weight: 500;
+      font-weight: 600;
+      font-family: inherit;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      transition: all 0.2s;
+      gap: 7px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
     }
-    .btn:hover { background: #334155; }
-    .btn-emerald { background: #059669; border-color: var(--emerald); }
-    .btn-emerald:hover { background: var(--emerald); }
-    .btn-danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #fca5a5; }
-    .btn-danger:hover { background: var(--rose); color: #ffffff; }
-    .btn-sm { padding: 4px 10px; font-size: 12px; border-radius: 4px; }
+    .btn:hover {
+      background: rgba(51, 65, 85, 0.85);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+    .btn:active { transform: translateY(0); }
+    .btn-emerald {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 4px 14px -2px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    .btn-emerald:hover {
+      background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+      box-shadow: 0 6px 20px -2px rgba(16, 185, 129, 0.55);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(185, 28, 28, 0.2) 100%);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+    }
+    .btn-danger:hover {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 14px -2px rgba(239, 68, 68, 0.4);
+      border-color: #ef4444;
+    }
+    .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
 
-    .table-wrap { overflow-x: auto; width: 100%; }
+    .table-wrap { overflow-x: auto; width: 100%; border-radius: 8px; border: 1px solid var(--card-border); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-    th { color: var(--text-dim); font-size: 11px; text-transform: uppercase; font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--card-border); }
-    td { padding: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
-    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+    th {
+      background: rgba(15, 23, 42, 0.85);
+      color: var(--text-dim);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    td {
+      padding: 13px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-variant-numeric: tabular-nums;
+    }
+    tr:hover td { background: rgba(255, 255, 255, 0.03); }
 
     .tag {
       display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
+      padding: 3px 9px;
+      border-radius: 6px;
       font-size: 11px;
       font-weight: 600;
+      letter-spacing: 0.2px;
     }
-    .tag-emerald { background: rgba(16, 185, 129, 0.12); color: var(--emerald-light); border: 1px solid rgba(16, 185, 129, 0.3); }
-    .tag-amber { background: rgba(245, 158, 11, 0.12); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.3); }
-    .tag-rose { background: rgba(239, 68, 68, 0.12); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .tag-emerald { background: var(--emerald-surface); color: var(--emerald-light); border: 1px solid var(--emerald-border); }
+    .tag-amber { background: var(--amber-surface); color: var(--amber-light); border: 1px solid var(--amber-border); }
+    .tag-rose { background: var(--rose-surface); color: var(--rose-light); border: 1px solid var(--rose-border); }
 
     .alert {
-      padding: 10px 14px;
-      border-radius: 6px;
+      padding: 12px 16px;
+      border-radius: 8px;
       font-size: 13px;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
-    .alert-warning { background: rgba(245, 158, 11, 0.1); border: 1px solid var(--amber); color: #fde68a; }
+    .alert-warning {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid var(--amber);
+      color: #fde68a;
+      box-shadow: 0 4px 16px -4px rgba(245, 158, 11, 0.25);
+    }
 
     .chip {
-      background: #172033;
-      border: 1px solid var(--card-border);
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 9999px;
       color: var(--text-muted);
-      font-size: 11px;
-      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 12px;
       cursor: pointer;
       user-select: none;
-      transition: all 0.15s ease;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
     }
     .chip:hover {
-      border-color: var(--emerald);
+      border-color: rgba(16, 185, 129, 0.6);
       color: #ffffff;
-      background: rgba(16, 185, 129, 0.1);
+      background: rgba(16, 185, 129, 0.12);
+      transform: translateY(-1px);
     }
     .chip.active {
       background: rgba(16, 185, 129, 0.2);
       border-color: var(--emerald);
       color: var(--emerald-light);
       font-weight: 600;
+      box-shadow: 0 0 12px -2px rgba(16, 185, 129, 0.3);
     }
     .runway-box {
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(15, 23, 42, 0.6));
-      border: 1px solid rgba(16, 185, 129, 0.25);
-      border-radius: 8px;
-      padding: 16px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, rgba(15, 23, 42, 0.7) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 14px;
+      padding: 20px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
+      box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.35);
     }
 
     footer {
       border-top: 1px solid var(--card-border);
-      padding: 16px;
+      padding: 20px;
       text-align: center;
       font-size: 12px;
       color: var(--text-dim);
     }
+
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
   </style>
 </head>
 <body>
 
   <header>
     <div class="brand-wrap">
-      <span class="brand-title">MonthEnd</span>
-      <span class="brand-subtitle">Budget & Expense Tracker</span>
+      <div class="brand-logo">₹</div>
+      <div>
+        <div class="brand-title">MonthEnd</div>
+        <div class="brand-subtitle">Smart Pacing & Survival Finance</div>
+      </div>
     </div>
     <div style="display: flex; align-items: center; gap: 14px;">
       <div class="cycle-badge">
@@ -261,33 +446,56 @@
   <main>
     <!-- Executive KPI Row -->
     <section class="kpi-grid">
-      <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
-        <div class="kpi-title">Net Balance We Have</div>
-        <div class="kpi-value" id="net-balance-val" style="color: #38bdf8;">₹0</div>
+      <div class="kpi-card kpi-card-sky">
+        <div class="kpi-header">
+          <div class="kpi-title">Net Balance We Have</div>
+          <span class="kpi-icon-pill" style="color: var(--sky); background: var(--sky-surface);">₹</span>
+        </div>
+        <div class="kpi-value" id="net-balance-val" style="color: var(--sky);">₹0</div>
         <div class="kpi-sub" id="net-balance-sub">Liquid cash · Goals: ₹0</div>
       </div>
-      <div class="kpi-card" style="border-left: 3px solid var(--emerald);">
-        <div class="kpi-title">Spendable Amount</div>
+
+      <div class="kpi-card kpi-card-emerald">
+        <div class="kpi-header">
+          <div class="kpi-title">Spendable Amount</div>
+          <span class="kpi-icon-pill" style="color: var(--emerald-light); background: var(--emerald-surface);">⚡</span>
+        </div>
         <div class="kpi-value" id="spendable-val" style="color: var(--emerald-light);">₹0</div>
         <div class="kpi-sub" id="spendable-sub">Unencumbered burn pool</div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Safe Daily Limit</div>
+
+      <div class="kpi-card kpi-card-amber">
+        <div class="kpi-header">
+          <div class="kpi-title">Safe Daily Limit</div>
+          <span class="kpi-icon-pill" style="color: var(--amber-light); background: var(--amber-surface);">📅</span>
+        </div>
         <div class="kpi-value" id="safe-daily-val">₹0</div>
         <div class="kpi-sub" id="today-spent-sub">Spent today: ₹0</div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Emergency Reserve</div>
+
+      <div class="kpi-card kpi-card-mint">
+        <div class="kpi-header">
+          <div class="kpi-title">Emergency Reserve</div>
+          <span class="kpi-icon-pill" style="color: #6ee7b7; background: rgba(110, 231, 183, 0.12);">🛡️</span>
+        </div>
         <div class="kpi-value" id="emergency-val" style="color: #6ee7b7;">₹0</div>
         <div class="kpi-sub" id="emergency-sub">Buffer: Adequate</div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Survival Runway</div>
-        <div class="kpi-value" id="runway-val" style="color: #a78bfa;">0 Days</div>
+
+      <div class="kpi-card kpi-card-indigo">
+        <div class="kpi-header">
+          <div class="kpi-title">Survival Runway</div>
+          <span class="kpi-icon-pill" style="color: var(--indigo); background: var(--indigo-surface);">⏳</span>
+        </div>
+        <div class="kpi-value" id="runway-val" style="color: var(--indigo);">0 Days</div>
         <div class="kpi-sub" id="runway-sub">At safe daily burn</div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Spent This Month</div>
+
+      <div class="kpi-card kpi-card-rose">
+        <div class="kpi-header">
+          <div class="kpi-title">Spent This Month</div>
+          <span class="kpi-icon-pill" style="color: var(--rose-light); background: var(--rose-surface);">💳</span>
+        </div>
         <div class="kpi-value" id="cycle-spent-val">₹0</div>
         <div class="kpi-sub" id="emis-pending-sub">Pending EMIs: ₹0</div>
       </div>
@@ -522,9 +730,14 @@
           <div class="panel-header">
             <h3 class="panel-title">Spending Breakdown</h3>
           </div>
-          <div style="padding: 10px 0;">
-            <h4 id="persona-name" style="font-size: 16px; font-weight: 600; color: #ffffff;">Steady Spender</h4>
-            <p id="persona-reason" style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Normal expenditure distribution detected.</p>
+          <div style="padding: 12px 16px; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; margin-top: 6px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 20px;">🧭</span>
+              <div>
+                <h4 id="persona-name" style="font-size: 15px; font-weight: 700; color: #ffffff;">Steady Spender</h4>
+                <p id="persona-reason" style="font-size: 12.5px; color: var(--text-muted); margin-top: 2px;">Normal expenditure distribution detected.</p>
+              </div>
+            </div>
           </div>
           <div class="panel-header" style="margin-top: 8px;">
             <h4 class="panel-title" style="font-size: 13px;">Savings Tips</h4>
@@ -544,11 +757,12 @@
         </div>
 
         <!-- Groq AI Advisor Panel -->
-        <div class="panel" style="grid-column: 1 / -1;">
+        <div class="panel" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(16, 185, 129, 0.05) 0%, rgba(15, 23, 42, 0.85) 100%); border-color: rgba(16, 185, 129, 0.25);">
           <div class="panel-header">
             <div>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <h3 class="panel-title">Groq AI Financial Guidance</h3>
+                <div style="width: 22px; height: 22px; border-radius: 6px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--emerald-light);">🤖</div>
+                <h3 class="panel-title" style="color: #ffffff;">Groq AI Financial Guidance</h3>
                 <span id="groq-profile-badge" class="tag tag-emerald" style="display: none;">📍 Hosteller Student • Panipat, Haryana</span>
               </div>
               <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Powered by External Groq Cloud AI Agent (GPT-OSS 120B / Qwen 3.8)</p>
@@ -557,7 +771,7 @@
               <span id="groq-btn-text">Generate Guidance</span>
             </button>
           </div>
-          <div id="groq-guidance-container" style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+          <div id="groq-guidance-container" style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6;">
             Click "Generate Guidance" to analyze your cycle limits, liabilities, living situation, and grocery/dining habits using Groq.
           </div>
         </div>
