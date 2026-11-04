@@ -227,7 +227,20 @@ def _get_dashboard_data() -> dict[str, Any]:
 
 def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
     """Standard WSGI entrypoint for Vercel Serverless Python."""
-    path = environ.get("PATH_INFO", "/").rstrip("/") or "/"
+    # Resolve real client URL from Vercel forward headers if rewritten to /api/index.py
+    forwarded_path = (
+        environ.get("HTTP_X_FORWARDED_URI")
+        or environ.get("HTTP_X_REAL_PATH")
+        or environ.get("HTTP_X_MATCHED_PATH")
+    )
+    if forwarded_path:
+        path = forwarded_path.split("?")[0].rstrip("/") or "/"
+    else:
+        path = environ.get("PATH_INFO", "/").rstrip("/") or "/"
+
+    if path in ("/api/index.py", "/api/index", "/api"):
+        path = "/"
+
     method = environ.get("REQUEST_METHOD", "GET").upper()
 
     def respond(status: str, content_type: str, body: bytes) -> list[bytes]:
