@@ -1,0 +1,16 @@
+# Tell Vercel to ignore Python entrypoints so it serves the static portal without serverless errors
+app.py
+analytics_engine.py
+budget_engine.py
+categories.py
+cycle_engine.py
+database.py
+formatters.py
+impulse_engine.py
+llm_client.py
+savings_engine.py
+supabase_backend.py
+requirements.txt
+Procfile
+scratch/
+*.db
