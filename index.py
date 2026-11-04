@@ -230,10 +230,15 @@ def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
     query_string = environ.get("QUERY_STRING", "")
     query_params = parse_qs(query_string)
 
-    # 1. Resolve path from explicit rewrite parameter if injected by vercel.json
+    # 1. Resolve path from explicit rewrite parameter or WSGI RAW_URI/REQUEST_URI
     rewrite_path = query_params.get("__path", [None])[0]
-    if rewrite_path:
+    raw_uri = environ.get("RAW_URI") or environ.get("REQUEST_URI")
+    if rewrite_path and rewrite_path not in ("/", "/:path*"):
         path = "/" + rewrite_path.lstrip("/").split("?")[0].rstrip("/")
+        if path == "":
+            path = "/"
+    elif raw_uri and not raw_uri.startswith("/api/index.py"):
+        path = "/" + raw_uri.lstrip("/").split("?")[0].rstrip("/")
         if path == "":
             path = "/"
     else:
@@ -286,6 +291,16 @@ def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
 
     try:
         # ─── API Routes ─────────────────────────────────────────────────────────
+
+        if path in ("/api/debug", "/debug") and method == "GET":
+            return json_response({
+                "resolved_path": path,
+                "PATH_INFO": environ.get("PATH_INFO"),
+                "QUERY_STRING": environ.get("QUERY_STRING"),
+                "HTTP_X_FORWARDED_URI": environ.get("HTTP_X_FORWARDED_URI"),
+                "HTTP_X_REAL_PATH": environ.get("HTTP_X_REAL_PATH"),
+                "HTTP_X_MATCHED_PATH": environ.get("HTTP_X_MATCHED_PATH"),
+            })
 
         if path == "/api/dashboard" and method == "GET":
             return json_response(_get_dashboard_data())
