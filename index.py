@@ -227,16 +227,26 @@ def _get_dashboard_data() -> dict[str, Any]:
 
 def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
     """Standard WSGI entrypoint for Vercel Serverless Python."""
-    # Resolve real client URL from Vercel forward headers if rewritten to /api/index.py
-    forwarded_path = (
-        environ.get("HTTP_X_FORWARDED_URI")
-        or environ.get("HTTP_X_REAL_PATH")
-        or environ.get("HTTP_X_MATCHED_PATH")
-    )
-    if forwarded_path:
-        path = forwarded_path.split("?")[0].rstrip("/") or "/"
+    query_string = environ.get("QUERY_STRING", "")
+    query_params = parse_qs(query_string)
+
+    # 1. Resolve path from explicit rewrite parameter if injected by vercel.json
+    rewrite_path = query_params.get("__path", [None])[0]
+    if rewrite_path:
+        path = "/" + rewrite_path.lstrip("/").split("?")[0].rstrip("/")
+        if path == "":
+            path = "/"
     else:
-        path = environ.get("PATH_INFO", "/").rstrip("/") or "/"
+        # 2. Resolve from Vercel forward headers
+        forwarded_path = (
+            environ.get("HTTP_X_FORWARDED_URI")
+            or environ.get("HTTP_X_REAL_PATH")
+            or environ.get("HTTP_X_MATCHED_PATH")
+        )
+        if forwarded_path:
+            path = forwarded_path.split("?")[0].rstrip("/") or "/"
+        else:
+            path = environ.get("PATH_INFO", "/").rstrip("/") or "/"
 
     if path in ("/api/index.py", "/api/index", "/api"):
         path = "/"
