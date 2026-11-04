@@ -1,4 +1,5 @@
 """Indian market category presets and payment mode definitions."""
+from typing import TypedDict
 
 # ---------- Expense categories ----------
 CATEGORIES = {
@@ -123,7 +124,13 @@ LIABILITY_TYPES = [
     "OTHER",
 ]
 
-BNPL_PRESETS = {
+class BNPLPreset(TypedDict, total=False):
+    type: str
+    interest_rate: float
+    note: str
+
+
+BNPL_PRESETS: dict[str, BNPLPreset] = {
     "Simpl": {"type": "BNPL", "interest_rate": 0.0, "note": "Pay next bill cycle"},
     "LazyPay": {"type": "BNPL", "interest_rate": 0.0, "note": "Pay by 3rd of next month"},
     "Amazon Pay Later": {"type": "BNPL", "interest_rate": 0.0, "note": "Pay by bill date"},

@@ -29,7 +29,7 @@ def _as_list_dicts(data: Any) -> list[dict[str, Any]]:
     """Safely convert PostgREST response data to list of dicts."""
     if not isinstance(data, list):
         return []
-    return [dict(item) for item in data if isinstance(item, dict)]
+    return [item for item in data if isinstance(item, dict)]
 
 
 def _extract_id(res: Any) -> int:
@@ -37,6 +37,8 @@ def _extract_id(res: Any) -> int:
     data = getattr(res, "data", None)
     if isinstance(data, list) and data and isinstance(data[0], dict):
         val = data[0].get("id")
+        if isinstance(val, int):
+            return val
         if val is not None:
             try:
                 return int(val)
@@ -252,12 +254,12 @@ def save_settings(payday_day: int, inflow_type: str, expected_amount: Any, curre
 
     payload: dict[str, Any] = {
         "id": 1,
-        "payday_day_of_month": int(payday_day),
-        "inflow_type": str(inflow_type),
+        "payday_day_of_month": payday_day,
+        "inflow_type": inflow_type,
         "expected_amount": str(expected_amount),
-        "currency": str(currency),
-        "use_custom_days": int(use_custom_days),
-        "custom_days_left": int(custom_days_left),
+        "currency": currency,
+        "use_custom_days": use_custom_days,
+        "custom_days_left": custom_days_left,
         "updated_at": datetime.now().isoformat(),
     }
     client.table("settings").upsert(payload).execute()
@@ -275,7 +277,7 @@ def save_plan(name: str, metrics: Any, advice_json: str) -> int:
         "total_money": str(metrics.total_money),
         "fixed_expenses": str(metrics.fixed_expenses),
         "reserve": str(metrics.emergency_reserve),
-        "days": int(metrics.days),
+        "days": metrics.days,
         "daily_allowance": str(metrics.daily_allowance),
         "advice_json": advice_json,
     }
@@ -295,7 +297,7 @@ def delete_plan(plan_id: int) -> None:
     client = get_client()
     if client is None:
         return
-    client.table("plans").delete().eq("id", int(plan_id)).execute()
+    client.table("plans").delete().eq("id", plan_id).execute()
 
 
 # ─── Expenses ─────────────────────────────────────────────────────────────────
@@ -313,11 +315,11 @@ def add_expense(plan_id: Any, amount: Any, category: str, note: str = "", spent_
         "plan_id": int(plan_id) if plan_id is not None else None,
         "spent_on": spent_on or date.today().isoformat(),
         "amount": str(amount),
-        "category": str(category),
+        "category": category,
         "note": (note or "").strip(),
-        "payment_mode": str(payment_mode),
+        "payment_mode": payment_mode,
         "is_planned": 1 if is_planned else 0,
-        "hour_logged": int(hour_logged),
+        "hour_logged": hour_logged,
     }
     res = client.table("expenses").insert(payload).execute()
     return _extract_id(res)
@@ -330,9 +332,9 @@ def list_expenses(plan_id: Optional[int] = None, spent_on: Optional[str] = None)
 
     query = client.table("expenses").select("*")
     if plan_id is not None:
-        query = query.eq("plan_id", int(plan_id))
+        query = query.eq("plan_id", plan_id)
     if spent_on is not None:
-        query = query.eq("spent_on", str(spent_on))
+        query = query.eq("spent_on", spent_on)
 
     res = query.order("spent_on", desc=True).order("id", desc=True).execute()
     return _as_list_dicts(res.data)
@@ -355,7 +357,7 @@ def delete_expense(expense_id: int) -> None:
     client = get_client()
     if client is None:
         return
-    client.table("expenses").delete().eq("id", int(expense_id)).execute()
+    client.table("expenses").delete().eq("id", expense_id).execute()
 
 
 def get_total_spent_in_range(start_date: str, end_date: str) -> Decimal:
@@ -380,8 +382,8 @@ def add_inflow(amount: Any, inflow_type: str, inflow_date: str, cycle_start: Opt
 
     payload: dict[str, Any] = {
         "amount": str(amount),
-        "type": str(inflow_type),
-        "date": str(inflow_date),
+        "type": inflow_type,
+        "date": inflow_date,
         "cycle_start": cycle_start,
         "cycle_end": cycle_end,
         "note": (note or "").strip(),
@@ -397,7 +399,7 @@ def list_inflows(limit: int = 50) -> list[dict[str, Any]]:
     res = client.table("inflows").select("*")\
         .order("date", desc=True)\
         .order("id", desc=True)\
-        .limit(int(limit))\
+        .limit(limit)\
         .execute()
     return _as_list_dicts(res.data)
 
@@ -423,13 +425,13 @@ def add_liability(name: str, liability_type: str, emi_amount: Any, principal: An
         return 0
 
     payload: dict[str, Any] = {
-        "name": str(name),
-        "type": str(liability_type),
+        "name": name,
+        "type": liability_type,
         "principal": str(principal),
         "emi_amount": str(emi_amount),
         "interest_rate": float(interest_rate or 0.0),
-        "tenure_remaining": int(tenure_remaining),
-        "due_day": int(due_day),
+        "tenure_remaining": tenure_remaining,
+        "due_day": due_day,
         "status": "ACTIVE",
         "note": (note or "").strip(),
     }
@@ -444,7 +446,7 @@ def list_liabilities(status: Optional[str] = "ACTIVE") -> list[dict[str, Any]]:
 
     query = client.table("liabilities").select("*")
     if status:
-        query = query.eq("status", str(status))
+        query = query.eq("status", status)
     res = query.order("due_day").order("id").execute()
     return _as_list_dicts(res.data)
 
@@ -453,14 +455,14 @@ def update_liability_status(liability_id: int, status: str) -> None:
     client = get_client()
     if client is None:
         return
-    client.table("liabilities").update({"status": str(status)}).eq("id", int(liability_id)).execute()
+    client.table("liabilities").update({"status": status}).eq("id", liability_id).execute()
 
 
 def delete_liability(liability_id: int) -> None:
     client = get_client()
     if client is None:
         return
-    client.table("liabilities").delete().eq("id", int(liability_id)).execute()
+    client.table("liabilities").delete().eq("id", liability_id).execute()
 
 
 def decrement_tenure(liability_id: int) -> None:
@@ -468,7 +470,7 @@ def decrement_tenure(liability_id: int) -> None:
     if client is None:
         return
 
-    res = client.table("liabilities").select("tenure_remaining").eq("id", int(liability_id)).execute()
+    res = client.table("liabilities").select("tenure_remaining").eq("id", liability_id).execute()
     rows = _as_list_dicts(res.data)
     if rows:
         cur_tenure = int(rows[0].get("tenure_remaining", 1))
@@ -476,7 +478,7 @@ def decrement_tenure(liability_id: int) -> None:
         up_data: dict[str, Any] = {"tenure_remaining": new_tenure}
         if new_tenure <= 0:
             up_data["status"] = "COMPLETED"
-        client.table("liabilities").update(up_data).eq("id", int(liability_id)).execute()
+        client.table("liabilities").update(up_data).eq("id", liability_id).execute()
 
 
 # ─── Liability Payments ──────────────────────────────────────────────────────
@@ -490,8 +492,8 @@ def add_liability_payment(liability_id: int, amount: Any, paid_date: Optional[st
         paid_date = date.today().isoformat()
 
     payload: dict[str, Any] = {
-        "liability_id": int(liability_id),
-        "paid_date": str(paid_date),
+        "liability_id": liability_id,
+        "paid_date": paid_date,
         "amount": str(amount),
     }
     res = client.table("liability_payments").insert(payload).execute()
@@ -505,7 +507,7 @@ def list_liability_payments(liability_id: Optional[int] = None) -> list[dict[str
 
     query = client.table("liability_payments").select("*")
     if liability_id is not None:
-        query = query.eq("liability_id", int(liability_id))
+        query = query.eq("liability_id", liability_id)
     res = query.order("paid_date", desc=True).execute()
     return _as_list_dicts(res.data)
 
@@ -537,10 +539,10 @@ def add_savings_goal(name: str, target_amount: Any, deadline: Optional[str] = No
         return 0
 
     payload: dict[str, Any] = {
-        "name": str(name),
+        "name": name,
         "target_amount": str(target_amount),
         "deadline": deadline,
-        "priority": int(priority),
+        "priority": priority,
         "current_amount": "0",
         "status": "ACTIVE",
     }
@@ -555,7 +557,7 @@ def list_savings_goals(status: Optional[str] = "ACTIVE") -> list[dict[str, Any]]
 
     query = client.table("savings_goals").select("*")
     if status:
-        query = query.eq("status", str(status))
+        query = query.eq("status", status)
     res = query.order("priority").order("id").execute()
     return _as_list_dicts(res.data)
 
@@ -564,21 +566,21 @@ def update_savings_goal_amount(goal_id: int, new_amount: Any) -> None:
     client = get_client()
     if client is None:
         return
-    client.table("savings_goals").update({"current_amount": str(new_amount)}).eq("id", int(goal_id)).execute()
+    client.table("savings_goals").update({"current_amount": str(new_amount)}).eq("id", goal_id).execute()
 
 
 def update_savings_goal_status(goal_id: int, status: str) -> None:
     client = get_client()
     if client is None:
         return
-    client.table("savings_goals").update({"status": str(status)}).eq("id", int(goal_id)).execute()
+    client.table("savings_goals").update({"status": status}).eq("id", goal_id).execute()
 
 
 def delete_savings_goal(goal_id: int) -> None:
     client = get_client()
     if client is None:
         return
-    client.table("savings_goals").delete().eq("id", int(goal_id)).execute()
+    client.table("savings_goals").delete().eq("id", goal_id).execute()
 
 
 # ─── Savings Transfers ───────────────────────────────────────────────────────
@@ -592,15 +594,15 @@ def add_savings_transfer(goal_id: int, amount: Any, transfer_date: Optional[str]
         transfer_date = date.today().isoformat()
 
     payload: dict[str, Any] = {
-        "goal_id": int(goal_id),
+        "goal_id": goal_id,
         "amount": str(amount),
-        "date": str(transfer_date),
+        "date": transfer_date,
     }
     res = client.table("savings_transfers").insert(payload).execute()
     new_id = _extract_id(res)
 
     # Increment goal current_amount
-    goal_res = client.table("savings_goals").select("current_amount, target_amount").eq("id", int(goal_id)).execute()
+    goal_res = client.table("savings_goals").select("current_amount, target_amount").eq("id", goal_id).execute()
     g_rows = _as_list_dicts(goal_res.data)
     if g_rows:
         g = g_rows[0]
@@ -609,7 +611,7 @@ def add_savings_transfer(goal_id: int, amount: Any, transfer_date: Optional[str]
         up_data: dict[str, Any] = {"current_amount": str(cur_amt)}
         if cur_amt >= target_amt:
             up_data["status"] = "REACHED"
-        client.table("savings_goals").update(up_data).eq("id", int(goal_id)).execute()
+        client.table("savings_goals").update(up_data).eq("id", goal_id).execute()
 
     return new_id
 
@@ -621,7 +623,7 @@ def list_savings_transfers(goal_id: Optional[int] = None) -> list[dict[str, Any]
 
     query = client.table("savings_transfers").select("*")
     if goal_id is not None:
-        query = query.eq("goal_id", int(goal_id))
+        query = query.eq("goal_id", goal_id)
     res = query.order("date", desc=True).execute()
     return _as_list_dicts(res.data)
 

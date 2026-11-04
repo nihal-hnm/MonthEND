@@ -11,6 +11,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
 import math
+from typing import Any
 
 import database
 from cycle_engine import CycleInfo, get_current_cycle
@@ -41,7 +42,7 @@ def mom_category_delta(cycle: CycleInfo, payday_day: int) -> list[dict]:
     prev_by_cat = _sum_by_category(prev_expenses)
 
     all_cats = set(current_by_cat.keys()) | set(prev_by_cat.keys())
-    result = []
+    result: list[dict[str, Any]] = []
     for cat in sorted(all_cats):
         curr = current_by_cat.get(cat, Decimal("0.00"))
         prev = prev_by_cat.get(cat, Decimal("0.00"))
@@ -62,7 +63,7 @@ def mom_category_delta(cycle: CycleInfo, payday_day: int) -> list[dict]:
         })
 
     # Sort by absolute delta descending
-    result.sort(key=lambda x: abs(float(str(x["delta_pct"]))), reverse=True)
+    result.sort(key=lambda x: abs(x["delta_pct"]), reverse=True)
     return result
 
 

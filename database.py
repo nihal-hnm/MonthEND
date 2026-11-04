@@ -50,7 +50,7 @@ def is_supabase_active(db_path=DB_PATH) -> bool:
         ok, _, details = supabase_backend.test_connection()
         _supabase_verified = ok and not details.get("schema_missing", False)
         _last_check_time = now
-    return bool(_supabase_verified)
+    return _supabase_verified
 
 
 def get_backend_info() -> dict[str, Any]:
@@ -102,7 +102,7 @@ def sync_sqlite_to_supabase() -> dict[str, int]:
 
 @contextmanager
 def _connection(db_path=DB_PATH):
-    conn = sqlite3.connect(str(db_path), timeout=10)
+    conn = sqlite3.connect(db_path, timeout=10)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA foreign_keys = ON")
@@ -248,7 +248,7 @@ def _sqlite_save_settings(payday_day: int, inflow_type: str, expected_amount: An
     with _connection(db_path) as conn:
         conn.execute(
             "UPDATE settings SET payday_day_of_month=?, inflow_type=?, expected_amount=?, currency=?, use_custom_days=?, custom_days_left=? WHERE id=1",
-            (payday_day, inflow_type, str(expected_amount), currency, int(use_custom_days), int(custom_days_left)),
+            (payday_day, inflow_type, str(expected_amount), currency, use_custom_days, custom_days_left),
         )
 
 
@@ -273,7 +273,7 @@ def _sqlite_save_plan(name: str, metrics: Any, advice_json: str, db_path=DB_PATH
              str(metrics.fixed_expenses), str(metrics.emergency_reserve),
              metrics.days, str(metrics.daily_allowance), advice_json),
         )
-        return int(cur.lastrowid or 0)
+        return cur.lastrowid or 0
 
 
 def save_plan(name: str, metrics: Any, advice_json: str, db_path=DB_PATH) -> int:
@@ -305,7 +305,7 @@ def delete_plan(plan_id: int, db_path=DB_PATH) -> None:
         except Exception as e:
             logger.warning("Supabase delete_plan failed: %s", e)
     with _connection(db_path) as conn:
-        conn.execute("DELETE FROM plans WHERE id=?", (int(plan_id),))
+        conn.execute("DELETE FROM plans WHERE id=?", (plan_id,))
 
 
 # ─── Expenses ─────────────────────────────────────────────────────────────────
@@ -318,9 +318,9 @@ def _sqlite_add_expense(plan_id: Optional[int], amount: Any, category: str, note
         cur = conn.execute(
             "INSERT INTO expenses(plan_id,spent_on,amount,category,note,payment_mode,is_planned,hour_logged) VALUES(?,?,?,?,?,?,?,?)",
             (plan_id, (spent_on or date.today().isoformat()), str(amount),
-             category, (note or "").strip(), payment_mode, int(is_planned), hour_logged),
+             category, (note or "").strip(), payment_mode, is_planned, hour_logged),
         )
-        return int(cur.lastrowid or 0)
+        return cur.lastrowid or 0
 
 
 def add_expense(plan_id: Optional[int], amount: Any, category: str, note: str = "", spent_on: Optional[str] = None,
@@ -345,10 +345,10 @@ def list_expenses(plan_id: Optional[int] = None, spent_on: Optional[str] = None,
     values: list[Any] = []
     if plan_id is not None:
         clauses.append("plan_id=?")
-        values.append(int(plan_id))
+        values.append(plan_id)
     if spent_on is not None:
         clauses.append("spent_on=?")
-        values.append(str(spent_on))
+        values.append(spent_on)
     sql = "SELECT * FROM expenses" + (" WHERE " + " AND ".join(clauses) if clauses else "") + " ORDER BY spent_on DESC, id DESC"
     with _connection(db_path) as conn:
         return [dict(row) for row in conn.execute(sql, values)]
@@ -375,7 +375,7 @@ def delete_expense(expense_id: int, db_path=DB_PATH) -> None:
         except Exception as e:
             logger.warning("Supabase delete_expense failed: %s", e)
     with _connection(db_path) as conn:
-        conn.execute("DELETE FROM expenses WHERE id=?", (int(expense_id),))
+        conn.execute("DELETE FROM expenses WHERE id=?", (expense_id,))
 
 
 def get_total_spent_in_range(start_date: str, end_date: str, db_path=DB_PATH) -> Decimal:
@@ -400,7 +400,7 @@ def _sqlite_add_inflow(amount: Any, inflow_type: str, inflow_date: str, cycle_st
             "INSERT INTO inflows(amount,type,date,cycle_start,cycle_end,note) VALUES(?,?,?,?,?,?)",
             (str(amount), inflow_type, inflow_date, cycle_start, cycle_end, (note or "").strip()),
         )
-        return int(cur.lastrowid or 0)
+        return cur.lastrowid or 0
 
 
 def add_inflow(amount: Any, inflow_type: str, inflow_date: str, cycle_start: Optional[str] = None, cycle_end: Optional[str] = None, note: str = "", db_path=DB_PATH) -> int:
@@ -449,7 +449,7 @@ def _sqlite_add_liability(name: str, liability_type: str, emi_amount: Any, princ
             (name, liability_type, str(principal), str(emi_amount), interest_rate or 0.0,
              tenure_remaining, due_day, (note or "").strip()),
         )
-        return int(cur.lastrowid or 0)
+        return cur.lastrowid or 0
 
 
 def add_liability(name: str, liability_type: str, emi_amount: Any, principal: Any = 0, interest_rate: Optional[float] = 0.0,
@@ -486,7 +486,7 @@ def update_liability_status(liability_id: int, status: str, db_path=DB_PATH) -> 
         except Exception as e:
             logger.warning("Supabase update_liability_status failed: %s", e)
     with _connection(db_path) as conn:
-        conn.execute("UPDATE liabilities SET status=? WHERE id=?", (status, int(liability_id)))
+        conn.execute("UPDATE liabilities SET status=? WHERE id=?", (status, liability_id))
 
 
 def delete_liability(liability_id: int, db_path=DB_PATH) -> None:
@@ -497,7 +497,7 @@ def delete_liability(liability_id: int, db_path=DB_PATH) -> None:
         except Exception as e:
             logger.warning("Supabase delete_liability failed: %s", e)
     with _connection(db_path) as conn:
-        conn.execute("DELETE FROM liabilities WHERE id=?", (int(liability_id),))
+        conn.execute("DELETE FROM liabilities WHERE id=?", (liability_id,))
 
 
 def decrement_tenure(liability_id: int, db_path=DB_PATH) -> None:
@@ -508,10 +508,10 @@ def decrement_tenure(liability_id: int, db_path=DB_PATH) -> None:
         except Exception as e:
             logger.warning("Supabase decrement_tenure failed: %s", e)
     with _connection(db_path) as conn:
-        conn.execute("UPDATE liabilities SET tenure_remaining = MAX(0, tenure_remaining - 1) WHERE id=?", (int(liability_id),))
-        row = conn.execute("SELECT tenure_remaining FROM liabilities WHERE id=?", (int(liability_id),)).fetchone()
+        conn.execute("UPDATE liabilities SET tenure_remaining = MAX(0, tenure_remaining - 1) WHERE id=?", (liability_id,))
+        row = conn.execute("SELECT tenure_remaining FROM liabilities WHERE id=?", (liability_id,)).fetchone()
         if row and row["tenure_remaining"] <= 0:
-            conn.execute("UPDATE liabilities SET status='COMPLETED' WHERE id=?", (int(liability_id),))
+            conn.execute("UPDATE liabilities SET status='COMPLETED' WHERE id=?", (liability_id,))
 
 
 # ─── Liability Payments ──────────────────────────────────────────────────────
@@ -522,9 +522,9 @@ def _sqlite_add_liability_payment(liability_id: int, amount: Any, paid_date: Opt
     with _connection(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO liability_payments(liability_id,paid_date,amount) VALUES(?,?,?)",
-            (int(liability_id), paid_date, str(amount)),
+            (liability_id, paid_date, str(amount)),
         )
-        return int(cur.lastrowid or 0)
+        return cur.lastrowid or 0
 
 
 def add_liability_payment(liability_id: int, amount: Any, paid_date: Optional[str] = None, db_path=DB_PATH) -> int:
@@ -547,7 +547,7 @@ def list_liability_payments(liability_id: Optional[int] = None, db_path=DB_PATH)
     with _connection(db_path) as conn:
         if liability_id is not None:
             return [dict(row) for row in conn.execute(
-                "SELECT * FROM liability_payments WHERE liability_id=? ORDER BY paid_date DESC", (int(liability_id),)
+                "SELECT * FROM liability_payments WHERE liability_id=? ORDER BY paid_date DESC", (liability_id,)
             )]
         return [dict(row) for row in conn.execute("SELECT * FROM liability_payments ORDER BY paid_date DESC")]
 
@@ -581,7 +581,7 @@ def _sqlite_add_savings_goal(name: str, target_amount: Any, deadline: Optional[s
             "INSERT INTO savings_goals(name,target_amount,deadline,priority) VALUES(?,?,?,?)",
             (name, str(target_amount), deadline, priority),
         )
-        return int(cur.lastrowid or 0)
+        return cur.lastrowid or 0
 
 
 def add_savings_goal(name: str, target_amount: Any, deadline: Optional[str] = None, priority: int = 1, db_path=DB_PATH) -> int:
@@ -617,7 +617,7 @@ def update_savings_goal_amount(goal_id: int, new_amount: Any, db_path=DB_PATH) -
         except Exception as e:
             logger.warning("Supabase update_savings_goal_amount failed: %s", e)
     with _connection(db_path) as conn:
-        conn.execute("UPDATE savings_goals SET current_amount=? WHERE id=?", (str(new_amount), int(goal_id)))
+        conn.execute("UPDATE savings_goals SET current_amount=? WHERE id=?", (str(new_amount), goal_id))
 
 
 def update_savings_goal_status(goal_id: int, status: str, db_path=DB_PATH) -> None:
@@ -628,7 +628,7 @@ def update_savings_goal_status(goal_id: int, status: str, db_path=DB_PATH) -> No
         except Exception as e:
             logger.warning("Supabase update_savings_goal_status failed: %s", e)
     with _connection(db_path) as conn:
-        conn.execute("UPDATE savings_goals SET status=? WHERE id=?", (status, int(goal_id)))
+        conn.execute("UPDATE savings_goals SET status=? WHERE id=?", (status, goal_id))
 
 
 def delete_savings_goal(goal_id: int, db_path=DB_PATH) -> None:
@@ -639,7 +639,7 @@ def delete_savings_goal(goal_id: int, db_path=DB_PATH) -> None:
         except Exception as e:
             logger.warning("Supabase delete_savings_goal failed: %s", e)
     with _connection(db_path) as conn:
-        conn.execute("DELETE FROM savings_goals WHERE id=?", (int(goal_id),))
+        conn.execute("DELETE FROM savings_goals WHERE id=?", (goal_id,))
 
 
 # ─── Savings Transfers ───────────────────────────────────────────────────────
@@ -650,16 +650,16 @@ def _sqlite_add_savings_transfer(goal_id: int, amount: Any, transfer_date: Optio
     with _connection(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO savings_transfers(goal_id,amount,date) VALUES(?,?,?)",
-            (int(goal_id), str(amount), transfer_date),
+            (goal_id, str(amount), transfer_date),
         )
-        row = conn.execute("SELECT current_amount FROM savings_goals WHERE id=?", (int(goal_id),)).fetchone()
+        row = conn.execute("SELECT current_amount FROM savings_goals WHERE id=?", (goal_id,)).fetchone()
         if row:
             new_amt = Decimal(row["current_amount"]) + Decimal(str(amount))
-            conn.execute("UPDATE savings_goals SET current_amount=? WHERE id=?", (str(new_amt), int(goal_id)))
-            target_row = conn.execute("SELECT target_amount FROM savings_goals WHERE id=?", (int(goal_id),)).fetchone()
+            conn.execute("UPDATE savings_goals SET current_amount=? WHERE id=?", (str(new_amt), goal_id))
+            target_row = conn.execute("SELECT target_amount FROM savings_goals WHERE id=?", (goal_id,)).fetchone()
             if target_row and new_amt >= Decimal(target_row["target_amount"]):
-                conn.execute("UPDATE savings_goals SET status='REACHED' WHERE id=?", (int(goal_id),))
-        return int(cur.lastrowid or 0)
+                conn.execute("UPDATE savings_goals SET status='REACHED' WHERE id=?", (goal_id,))
+        return cur.lastrowid or 0
 
 
 def add_savings_transfer(goal_id: int, amount: Any, transfer_date: Optional[str] = None, db_path=DB_PATH) -> int:
@@ -682,7 +682,7 @@ def list_savings_transfers(goal_id: Optional[int] = None, db_path=DB_PATH) -> li
     with _connection(db_path) as conn:
         if goal_id is not None:
             return [dict(row) for row in conn.execute(
-                "SELECT * FROM savings_transfers WHERE goal_id=? ORDER BY date DESC", (int(goal_id),)
+                "SELECT * FROM savings_transfers WHERE goal_id=? ORDER BY date DESC", (goal_id,)
             )]
         return [dict(row) for row in conn.execute("SELECT * FROM savings_transfers ORDER BY date DESC")]
 

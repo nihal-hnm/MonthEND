@@ -420,7 +420,7 @@ with st.sidebar:
         new_inflow_type = st.selectbox(
             "Income Stream Type", INFLOW_TYPES,
             index=INFLOW_TYPES.index(INFLOW_TYPE) if INFLOW_TYPE in INFLOW_TYPES else 0,
-            format_func=lambda x: str(INFLOW_LABELS.get(x, x)),
+            format_func=lambda x: INFLOW_LABELS.get(x, x),
         )
         new_expected = st.number_input(
             "Expected Monthly Income (₹)", min_value=0.0,
@@ -678,7 +678,7 @@ with tab_log:
             for group_name, items in CATEGORIES.items():
                 for item in items:
                     all_cats_flat.append(item)
-            category = st.selectbox("Category Preset", all_cats_flat)
+            category = st.selectbox("Category Preset", all_cats_flat) or "Other"
 
         col_mode, col_date = st.columns(2)
         with col_mode:
@@ -696,7 +696,7 @@ with tab_log:
 
     if submitted:
         hour_now = datetime.now().hour
-        impulse_result = check_impulse_flags(amount, str(category or "Other"), metrics.safe_daily_limit, hour_now)
+        impulse_result = check_impulse_flags(amount, category, metrics.safe_daily_limit, hour_now)
 
         if impulse_result["needs_cooldown"]:
             st.warning("🛑 **HIGH IMPULSE VELOCITY TRIGGERED** — Cooldown activated:")
@@ -717,7 +717,7 @@ with tab_log:
                     st.info(f"💡 {flag}")
 
             database.add_expense(
-                plan_id=None, amount=money(amount), category=str(category or "Other"),
+                plan_id=None, amount=money(amount), category=category,
                 note=note, spent_on=spend_date.isoformat(),
                 payment_mode=payment_mode, is_planned=is_planned, hour_logged=hour_now,
             )
@@ -837,27 +837,31 @@ with tab_lia:
     preset_choice = st.selectbox("Instant Indian Credit Presets", ["Custom"] + list(BNPL_PRESETS.keys()))
     with st.form("new_liability_form", clear_on_submit=True):
         preset_data = BNPL_PRESETS.get(preset_choice, {})
+        preset_type = preset_data.get("type", "EMI")
+        preset_rate = preset_data.get("interest_rate", 0.0)
+        preset_note = preset_data.get("note", "")
+
         nl_c1, nl_c2 = st.columns(2)
         nl_name = nl_c1.text_input("Obligation Name", value=preset_choice if preset_choice != "Custom" else "")
         nl_type = nl_c2.selectbox(
             "Obligation Type", LIABILITY_TYPES,
-            index=LIABILITY_TYPES.index(preset_data.get("type", "EMI")) if preset_data.get("type") in LIABILITY_TYPES else 0
+            index=LIABILITY_TYPES.index(preset_type) if preset_type in LIABILITY_TYPES else 0
         )
 
         nl_c3, nl_c4, nl_c5 = st.columns(3)
         nl_emi = nl_c3.number_input("Monthly Payment (₹)", min_value=0.0, step=100.0, format="%.0f")
         nl_principal = nl_c4.number_input("Total Principal (₹)", min_value=0.0, step=1000.0, format="%.0f")
-        nl_tenure = nl_c5.number_input("Tenure (Months)", min_value=1, value=1 if preset_data.get("type") == "BNPL" else 12, step=1)
+        nl_tenure = nl_c5.number_input("Tenure (Months)", min_value=1, value=1 if preset_type == "BNPL" else 12, step=1)
 
         nl_c6, nl_c7 = st.columns(2)
         nl_due = nl_c6.number_input("Due Day of Month", min_value=1, max_value=28, value=1, step=1)
-        nl_rate = nl_c7.number_input("Interest Rate (%)", min_value=0.0, value=preset_data.get("interest_rate", 0.0), step=0.5, format="%.1f")
+        nl_rate = nl_c7.number_input("Interest Rate (%)", min_value=0.0, value=preset_rate, step=0.5, format="%.1f")
 
-        nl_note = st.text_input("Memo / Account Ref", value=preset_data.get("note", ""))
+        nl_note = st.text_input("Memo / Account Ref", value=preset_note)
 
         if st.form_submit_button("➕ Register Facility", type="primary", use_container_width=True):
             if nl_name and nl_emi > 0:
-                database.add_liability(nl_name, str(nl_type or "EMI"), nl_emi, float(nl_principal), float(nl_rate or 0.0), int(nl_tenure), int(nl_due), str(nl_note or ""))
+                database.add_liability(nl_name, nl_type or "EMI", nl_emi, nl_principal, nl_rate, nl_tenure, nl_due, nl_note)
                 st.success(f"Facility '{nl_name}' registered successfully!")
                 st.rerun()
             else:
@@ -901,7 +905,7 @@ with tab_save:
                 g_c1, g_c2, g_c3 = st.columns(3)
                 g_c1.metric("Remaining Needed", format_inr(gp.remaining))
                 g_c2.metric("Monthly Quota", format_inr(gp.monthly_needed))
-                g_c3.metric("Months Remaining", str(gp.months_left))
+                g_c3.metric("Months Remaining", gp.months_left)
 
                 t_c1, t_c2 = st.columns([2, 1])
                 with t_c1:
@@ -985,7 +989,7 @@ with tab_analytics:
     cycle_expenses = database.list_expenses_range(cycle.cycle_start.isoformat(), cycle.cycle_end.isoformat())
     if cycle_expenses:
         from collections import defaultdict as dd
-        cat_totals = dd(Decimal)
+        cat_totals: dict[str, Decimal] = dd(Decimal)
         for e in cycle_expenses:
             cat_totals[e["category"]] += money(e["amount"])
         sorted_cats = sorted(cat_totals.items(), key=lambda x: x[1], reverse=True)
