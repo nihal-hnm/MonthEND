@@ -293,7 +293,7 @@ p, span, label, .stMarkdown {
 }
 .stTabs [aria-selected="true"] {
     background-color: #1e293b !important;
-    color: #38bdf8 !important;
+    color: #60a5fa !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 /* Form Controls in Dark Mode */
@@ -331,15 +331,13 @@ header_col1, header_col2 = st.columns([5, 1.4])
 with header_col1:
     title_badge_html = f"""
     <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 4px;">
-        <span style="font-size: 2.1rem; font-weight: 800; letter-spacing: -0.02em; 
-                     background: linear-gradient(135deg, {'#0284c7, #2563eb' if is_light else '#38bdf8, #818cf8'});
-                     -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        <span style="font-size: 2.1rem; font-weight: 800; letter-spacing: -0.02em; color: {'#0f172a' if is_light else '#f0f6fc'};">
             MonthEnd
         </span>
         <span style="font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 9999px;
-                     background: {'#e0f2fe' if is_light else '#1e293b'}; 
-                     color: {'#0369a1' if is_light else '#38bdf8'}; 
-                     border: 1px solid {'#bae6fd' if is_light else '#334155'};">
+                     background: {'#e0f2fe' if is_light else '#21262d'}; 
+                     color: {'#0369a1' if is_light else '#60a5fa'}; 
+                     border: 1px solid {'#bae6fd' if is_light else '#30363d'};">
             MONTHEND BUDGET
         </span>
     </div>
@@ -391,14 +389,14 @@ status_banner_html = f"""
                 <span>Cycle Elapsed</span>
                 <span>{cycle_progress_pct}%</span>
             </div>
-            <div style="width: 100%; height: 6px; background: {'#e2e8f0' if is_light else '#334155'}; border-radius: 9999px; overflow: hidden;">
-                <div style="width: {cycle_progress_pct}%; height: 100%; background: {'#0284c7' if is_light else '#38bdf8'}; border-radius: 9999px;"></div>
+            <div style="width: 100%; height: 6px; background: {'#e2e8f0' if is_light else '#21262d'}; border-radius: 9999px; overflow: hidden;">
+                <div style="width: {cycle_progress_pct}%; height: 100%; background: {'#0284c7' if is_light else '#2563eb'}; border-radius: 9999px;"></div>
             </div>
         </div>
         <span style="font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: 8px;
-                     background: {'#f0fdf4' if is_light else 'rgba(16, 185, 129, 0.15)'}; 
-                     color: {'#16a34a' if is_light else '#34d399'}; 
-                     border: 1px solid {'#bbf7d0' if is_light else 'rgba(16, 185, 129, 0.3)'};">
+                     background: {'#f0fdf4' if is_light else '#14281e'}; 
+                     color: {'#16a34a' if is_light else '#4ade80'}; 
+                     border: 1px solid {'#bbf7d0' if is_light else '#1e452f'};">
             {cycle.days_remaining}D LEFT
         </span>
     </div>
@@ -663,7 +661,7 @@ with tab_dash:
                                 {status_icon} {lia['emi_status']}
                             </span>
                         </div>
-                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: {'#0284c7' if is_light else '#38bdf8'}; margin-bottom: 4px;">
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: {'#0284c7' if is_light else '#60a5fa'}; margin-bottom: 4px;">
                      
                             {format_inr(lia['emi_amount'])}
                         </div>

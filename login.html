@@ -13,28 +13,28 @@
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
   </style>
 </head>
-<body style="background: radial-gradient(circle at 50% -10%, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.6) 40%, #070a12 85%), #070a12;" class="text-[#f8fafc] antialiased min-h-screen flex items-center justify-center p-4">
+<body class="bg-[#0d1117] text-[#f0f6fc] antialiased min-h-screen flex items-center justify-center p-4">
 
-  <div class="w-full max-w-md bg-[#101623] border border-[#1e293b] rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden transition-all duration-300">
+  <div class="w-full max-w-md bg-[#161b22] border border-[#30363d] rounded-xl p-6 sm:p-8 relative overflow-hidden">
     
     <!-- Accent line -->
-    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400"></div>
+    <div class="absolute top-0 left-0 right-0 h-1 bg-[#2563eb]"></div>
 
     <!-- Header Section -->
     <div class="flex flex-col items-center text-center mb-6">
-      <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xl mb-3 shadow-inner">
+      <div class="w-12 h-12 rounded-lg bg-[#21262d] border border-[#30363d] flex items-center justify-center text-[#60a5fa] font-bold text-xl mb-3">
         ₹
       </div>
-      <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-white">MonthEnd</h1>
-      <p class="text-sm text-slate-400 mt-1" id="subheading-text">Sign in to sync your budget & liabilities</p>
+      <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-[#f0f6fc]">MonthEnd</h1>
+      <p class="text-sm text-[#8b949e] mt-1" id="subheading-text">Sign in to sync your budget & liabilities</p>
     </div>
 
     <!-- Mode Selector Tabs (Sign In / Sign Up) -->
-    <div class="grid grid-cols-2 p-1 bg-[#172033]/80 border border-[#1e293b] rounded-xl mb-6 text-sm font-medium">
-      <button id="tab-login" onclick="setMode('login')" class="py-2 px-3 rounded-lg transition-all duration-200 text-center font-semibold bg-[#101623] text-white shadow-sm">
+    <div class="grid grid-cols-2 p-1 bg-[#0d1117] border border-[#30363d] rounded-lg mb-6 text-sm font-medium">
+      <button id="tab-login" onclick="setMode('login')" class="py-2 px-3 rounded-md transition-colors text-center font-semibold bg-[#2563eb] text-white">
         Sign In
       </button>
-      <button id="tab-signup" onclick="setMode('signup')" class="py-2 px-3 rounded-lg transition-all duration-200 text-center font-medium text-slate-400 hover:text-white">
+      <button id="tab-signup" onclick="setMode('signup')" class="py-2 px-3 rounded-md transition-colors text-center font-medium text-[#8b949e] hover:text-white">
         Sign Up
       </button>
     </div>
@@ -47,27 +47,27 @@
       
       <!-- Full Name (Only for Sign Up) -->
       <div id="field-name" class="hidden space-y-1.5">
-        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Full Name</label>
+        <label class="block text-xs font-semibold text-[#8b949e] uppercase tracking-wider">Full Name</label>
         <div class="relative">
           <input 
             type="text" 
             id="input-name" 
             placeholder="e.g. Rahul Sharma" 
-            class="w-full px-3.5 py-2.5 bg-[#172033] border border-[#1e293b] rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+            class="w-full px-3.5 py-2.5 bg-[#0d1117] border border-[#30363d] rounded-lg text-sm text-[#f0f6fc] placeholder-[#6e7681] focus:outline-none focus:border-[#2563eb] transition-colors"
           />
         </div>
       </div>
 
       <!-- Email Address -->
       <div class="space-y-1.5">
-        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Email Address</label>
+        <label class="block text-xs font-semibold text-[#8b949e] uppercase tracking-wider">Email Address</label>
         <div class="relative">
           <input 
             type="email" 
             id="input-email" 
             placeholder="name@example.com" 
             required 
-            class="w-full px-3.5 py-2.5 bg-[#172033] border border-[#1e293b] rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+            class="w-full px-3.5 py-2.5 bg-[#0d1117] border border-[#30363d] rounded-lg text-sm text-[#f0f6fc] placeholder-[#6e7681] focus:outline-none focus:border-[#2563eb] transition-colors"
           />
         </div>
       </div>
@@ -75,8 +75,8 @@
       <!-- Password -->
       <div class="space-y-1.5">
         <div class="flex items-center justify-between">
-          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Password</label>
-          <a href="#" onclick="handleForgotPassword(event)" id="forgot-link" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium transition-colors">Forgot?</a>
+          <label class="block text-xs font-semibold text-[#8b949e] uppercase tracking-wider">Password</label>
+          <a href="#" onclick="handleForgotPassword(event)" id="forgot-link" class="text-xs text-[#60a5fa] hover:text-[#93c5fd] font-medium transition-colors">Forgot?</a>
         </div>
         <div class="relative flex items-center">
           <input 
@@ -85,18 +85,18 @@
             placeholder="••••••••" 
             required 
             minlength="6"
-            class="w-full px-3.5 py-2.5 bg-[#172033] border border-[#1e293b] rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all pr-12"
+            class="w-full px-3.5 py-2.5 bg-[#0d1117] border border-[#30363d] rounded-lg text-sm text-[#f0f6fc] placeholder-[#6e7681] focus:outline-none focus:border-[#2563eb] transition-colors pr-12"
           />
           <button 
             type="button" 
             onclick="togglePasswordVisibility()" 
-            class="absolute right-3 text-xs text-slate-400 hover:text-white transition-colors focus:outline-none"
+            class="absolute right-3 text-xs text-[#8b949e] hover:text-white transition-colors focus:outline-none"
             title="Toggle password view"
           >
             <span id="pw-toggle-label">Show</span>
           </button>
         </div>
-        <p id="pw-hint" class="hidden text-[11px] text-slate-500 mt-1">Must be at least 6 characters</p>
+        <p id="pw-hint" class="hidden text-[11px] text-[#6e7681] mt-1">Must be at least 6 characters</p>
       </div>
 
       <!-- Remember Me -->
@@ -105,9 +105,9 @@
           type="checkbox" 
           id="remember-me" 
           checked 
-          class="w-4 h-4 rounded border-slate-700 bg-[#172033] text-emerald-500 focus:ring-emerald-500/30 cursor-pointer"
+          class="w-4 h-4 rounded border-[#30363d] bg-[#0d1117] text-[#2563eb] focus:ring-0 cursor-pointer"
         />
-        <label for="remember-me" class="text-xs text-slate-400 cursor-pointer select-none">
+        <label for="remember-me" class="text-xs text-[#8b949e] cursor-pointer select-none">
           Stay signed in for 30 days
         </label>
       </div>
@@ -116,7 +116,7 @@
       <button 
         type="submit" 
         id="submit-btn" 
-        class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-2 mt-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
+        class="w-full py-2.5 px-4 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2 mt-2 cursor-pointer"
       >
         <span id="btn-text">Sign In</span>
         <svg id="btn-spinner" class="hidden animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -129,10 +129,10 @@
     <!-- Alternative Divider -->
     <div class="relative my-6">
       <div class="absolute inset-0 flex items-center">
-        <div class="w-full border-t border-[#1e293b]"></div>
+        <div class="w-full border-t border-[#30363d]"></div>
       </div>
       <div class="relative flex justify-center text-xs">
-        <span class="bg-[#101623] px-3 text-slate-400">or explore without cloud</span>
+        <span class="bg-[#161b22] px-3 text-[#8b949e]">or explore without cloud</span>
       </div>
     </div>
 
@@ -140,15 +140,15 @@
     <button 
       type="button" 
       onclick="handleGuestAccess()" 
-      class="w-full py-2.5 px-4 bg-[#172033]/60 hover:bg-[#172033] border border-[#1e293b] text-slate-300 hover:text-white font-medium rounded-lg text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer"
+      class="w-full py-2.5 px-4 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] hover:text-white font-medium rounded-lg text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
     >
-      <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+      <span class="inline-block w-2 h-2 rounded-full bg-[#16a34a]"></span>
       <span>Continue in Offline / Local Mode</span>
     </button>
 
     <!-- Privacy Note -->
-    <div class="mt-6 text-center text-xs text-slate-500 flex items-center justify-center gap-1.5">
-      <svg class="w-3.5 h-3.5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+    <div class="mt-6 text-center text-xs text-[#6e7681] flex items-center justify-center gap-1.5">
+      <svg class="w-3.5 h-3.5 text-[#16a34a]" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v4a1 1 0 102 0V7z" clip-rule="evenodd" />
       </svg>
       <span>Row-level security encrypted with Supabase</span>
@@ -173,16 +173,16 @@
       banner.classList.add('hidden');
 
       if (mode === 'login') {
-        tabLogin.className = "py-2 px-3 rounded-lg transition-all duration-200 text-center font-semibold bg-[#101623] text-white shadow-sm";
-        tabSignup.className = "py-2 px-3 rounded-lg transition-all duration-200 text-center font-medium text-slate-400 hover:text-white";
+        tabLogin.className = "py-2 px-3 rounded-md transition-colors text-center font-semibold bg-[#2563eb] text-white";
+        tabSignup.className = "py-2 px-3 rounded-md transition-colors text-center font-medium text-[#8b949e] hover:text-white";
         fieldName.classList.add('hidden');
         forgotLink.classList.remove('hidden');
         pwHint.classList.add('hidden');
         btnText.innerText = "Sign In";
         subheading.innerText = "Sign in to sync your budget & liabilities";
       } else {
-        tabSignup.className = "py-2 px-3 rounded-lg transition-all duration-200 text-center font-semibold bg-[#101623] text-white shadow-sm";
-        tabLogin.className = "py-2 px-3 rounded-lg transition-all duration-200 text-center font-medium text-slate-400 hover:text-white";
+        tabSignup.className = "py-2 px-3 rounded-md transition-colors text-center font-semibold bg-[#2563eb] text-white";
+        tabLogin.className = "py-2 px-3 rounded-md transition-colors text-center font-medium text-[#8b949e] hover:text-white";
         fieldName.classList.remove('hidden');
         forgotLink.classList.add('hidden');
         pwHint.classList.remove('hidden');
@@ -207,11 +207,11 @@
       const banner = document.getElementById('status-banner');
       banner.classList.remove('hidden');
       if (type === 'error') {
-        banner.className = "mb-4 p-3 rounded-lg text-xs font-medium border border-rose-500/30 bg-rose-500/10 text-rose-300 flex items-center gap-2";
-        banner.innerHTML = `<span class="text-rose-400">⚠️</span> <span>${message}</span>`;
+        banner.className = "mb-4 p-3 rounded-lg text-xs font-medium border border-[#4d1e24] bg-[#2c1518] text-[#f87171] flex items-center gap-2";
+        banner.innerHTML = `<span>⚠️</span> <span>${message}</span>`;
       } else {
-        banner.className = "mb-4 p-3 rounded-lg text-xs font-medium border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 flex items-center gap-2";
-        banner.innerHTML = `<span class="text-emerald-400">✓</span> <span>${message}</span>`;
+        banner.className = "mb-4 p-3 rounded-lg text-xs font-medium border border-[#1e452f] bg-[#14281e] text-[#4ade80] flex items-center gap-2";
+        banner.innerHTML = `<span>✓</span> <span>${message}</span>`;
       }
     }
 
