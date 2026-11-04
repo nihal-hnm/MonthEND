@@ -194,6 +194,41 @@
     }
     .alert-warning { background: rgba(245, 158, 11, 0.1); border: 1px solid var(--amber); color: #fde68a; }
 
+    .chip {
+      background: #172033;
+      border: 1px solid var(--card-border);
+      border-radius: 9999px;
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 4px 10px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .chip:hover {
+      border-color: var(--emerald);
+      color: #ffffff;
+      background: rgba(16, 185, 129, 0.1);
+    }
+    .chip.active {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--emerald);
+      color: var(--emerald-light);
+      font-weight: 600;
+    }
+    .runway-box {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(15, 23, 42, 0.6));
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
     footer {
       border-top: 1px solid var(--card-border);
       padding: 16px;
@@ -227,19 +262,24 @@
     <!-- Executive KPI Row -->
     <section class="kpi-grid">
       <div class="kpi-card">
-        <div class="kpi-title">Daily Limit</div>
+        <div class="kpi-title">Safe Daily Limit</div>
         <div class="kpi-value" id="safe-daily-val">₹0</div>
         <div class="kpi-sub" id="today-spent-sub">Spent today: ₹0</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-title">Remaining Budget</div>
+        <div class="kpi-title">Spendable Pool</div>
         <div class="kpi-value" id="usable-pool-val">₹0</div>
         <div class="kpi-sub" id="days-rem-sub">0 days left in cycle</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-title">Projected Month-End</div>
-        <div class="kpi-value" id="projected-val">₹0</div>
-        <div class="kpi-sub" id="run-rate-sub">₹0/day current pace</div>
+        <div class="kpi-title">Emergency Reserve</div>
+        <div class="kpi-value" id="emergency-val" style="color: #6ee7b7;">₹0</div>
+        <div class="kpi-sub" id="emergency-sub">Buffer: Adequate</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Survival Runway</div>
+        <div class="kpi-value" id="runway-val" style="color: #38bdf8;">0 Days</div>
+        <div class="kpi-sub" id="runway-sub">At safe daily burn</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-title">Spent This Month</div>
@@ -251,10 +291,10 @@
     <!-- Navigation Tabs -->
     <nav class="nav-tabs">
       <button class="tab-btn active" onclick="switchTab('tab-expenses')">Expenses</button>
+      <button class="tab-btn" onclick="switchTab('tab-settings')">Living Setup & Baseline</button>
       <button class="tab-btn" onclick="switchTab('tab-liabilities')">Liabilities & EMIs</button>
       <button class="tab-btn" onclick="switchTab('tab-savings')">Savings Goals</button>
       <button class="tab-btn" onclick="switchTab('tab-analytics')">Spending Analytics</button>
-      <button class="tab-btn" onclick="switchTab('tab-settings')">Cycle Settings</button>
     </nav>
 
     <!-- TAB 1: EXPENSES -->
@@ -484,7 +524,10 @@
         <div class="panel" style="grid-column: 1 / -1;">
           <div class="panel-header">
             <div>
-              <h3 class="panel-title">Groq AI Financial Guidance</h3>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h3 class="panel-title">Groq AI Financial Guidance</h3>
+                <span id="groq-profile-badge" class="tag tag-emerald" style="display: none;">📍 Hosteller Student • Panipat, Haryana</span>
+              </div>
               <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Powered by External Groq Cloud AI Agent (GPT-OSS 120B / Qwen 3.8)</p>
             </div>
             <button class="btn btn-emerald btn-sm" id="btn-groq-generate" onclick="handleGenerateGroqGuidance()">
@@ -492,75 +535,183 @@
             </button>
           </div>
           <div id="groq-guidance-container" style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
-            Click "Generate Guidance" to analyze your cycle limits, liabilities, and grocery/dining habits using Groq.
+            Click "Generate Guidance" to analyze your cycle limits, liabilities, living situation, and grocery/dining habits using Groq.
           </div>
         </div>
       </div>
     </section>
 
-    <!-- TAB 5: CYCLE & SETTINGS -->
+    <!-- TAB 5: LIVING SETUP & BASELINE -->
     <section id="tab-settings" class="tab-content">
+      <div id="settings-alert" class="alert alert-warning" style="display:none; background:rgba(16,185,129,0.15); border-color:var(--emerald); color:#6ee7b7;"></div>
       <div class="grid-2">
+        <!-- Living Situation & Region Context -->
         <div class="panel">
           <div class="panel-header">
-            <h3 class="panel-title">Cycle & Income Anchor</h3>
+            <div>
+              <h3 class="panel-title">Living Situation & Resources</h3>
+              <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Used by Groq AI and pacing algorithms to personalize survival limits</p>
+            </div>
+            <span class="tag tag-emerald" id="living-status-tag">Active Setup</span>
           </div>
           <form onsubmit="handleSaveSettings(event)">
+            <div class="form-group">
+              <label class="form-label">Where do you live?</label>
+              <select id="setting-living-situation" class="form-select">
+                <option value="Hosteller Student">Hosteller Student (College Hostel / Mess)</option>
+                <option value="Shared Flat / PG (Cook Yourself)">Shared Flat / PG (Self-cooking with flatmates)</option>
+                <option value="PG with Mess / Food Included">PG with Food / Tiffin Service Included</option>
+                <option value="Independent Flat / Studio">Independent Flat / Studio</option>
+                <option value="Living with Family / Parents">Living with Family / Parents</option>
+                <option value="Working Professional PG">Working Professional PG</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Location (City / State)</label>
+              <input type="text" id="setting-location" class="form-input" placeholder="e.g. Panipat, Haryana" value="Panipat, Haryana" required />
+              <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                <span style="font-size: 11px; color: var(--text-dim); align-self: center; margin-right: 4px;">Quick Select:</span>
+                <span class="chip loc-chip" data-val="Panipat, Haryana" onclick="setQuickLocation('Panipat, Haryana')">📍 Panipat</span>
+                <span class="chip loc-chip" data-val="Delhi NCR" onclick="setQuickLocation('Delhi NCR')">📍 Delhi NCR</span>
+                <span class="chip loc-chip" data-val="Kota, Rajasthan" onclick="setQuickLocation('Kota, Rajasthan')">📍 Kota</span>
+                <span class="chip loc-chip" data-val="Chandigarh" onclick="setQuickLocation('Chandigarh')">📍 Chandigarh</span>
+                <span class="chip loc-chip" data-val="Bengaluru, Karnataka" onclick="setQuickLocation('Bengaluru, Karnataka')">📍 Bengaluru</span>
+                <span class="chip loc-chip" data-val="Pune, Maharashtra" onclick="setQuickLocation('Pune, Maharashtra')">📍 Pune</span>
+                <span class="chip loc-chip" data-val="Mumbai, Maharashtra" onclick="setQuickLocation('Mumbai, Maharashtra')">📍 Mumbai</span>
+                <span class="chip loc-chip" data-val="Jaipur, Rajasthan" onclick="setQuickLocation('Jaipur, Rajasthan')">📍 Jaipur</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Available Resources & Appliances on Hand</label>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+                <span class="chip res-chip" data-val="Electric kettle" onclick="toggleResourceChip('Electric kettle')">⚡ Electric Kettle</span>
+                <span class="chip res-chip" data-val="Induction cooktop" onclick="toggleResourceChip('Induction cooktop')">🍳 Induction Cooktop</span>
+                <span class="chip res-chip" data-val="Mess subscription" onclick="toggleResourceChip('Mess subscription')">🍽️ Mess Subscription</span>
+                <span class="chip res-chip" data-val="Mini fridge" onclick="toggleResourceChip('Mini fridge')">❄️ Mini Fridge</span>
+                <span class="chip res-chip" data-val="Bicycle" onclick="toggleResourceChip('Bicycle')">🚲 Bicycle / Bike</span>
+                <span class="chip res-chip" data-val="Campus Wi-Fi" onclick="toggleResourceChip('Campus Wi-Fi')">📶 Campus Wi-Fi</span>
+                <span class="chip res-chip" data-val="Chai / tea kit" onclick="toggleResourceChip('Chai / tea kit')">☕ Chai Kit</span>
+                <span class="chip res-chip" data-val="Washing machine" onclick="toggleResourceChip('Washing machine')">🧺 Washing Machine</span>
+                <span class="chip res-chip" data-val="Tiffin service" onclick="toggleResourceChip('Tiffin service')">🍱 Tiffin Service</span>
+                <span class="chip res-chip" data-val="Kirana nearby" onclick="toggleResourceChip('Kirana nearby')">🛒 Kirana Nearby</span>
+              </div>
+              <textarea id="setting-resources" class="form-input" rows="2" placeholder="List appliances, pantry staples, meal passes (comma-separated)..."></textarea>
+            </div>
+
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Payday Day of Month (1-28)</label>
+                <label class="form-label">Anchor Payday (1-28)</label>
                 <input type="number" id="setting-payday" class="form-input" min="1" max="28" value="1" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Income Type</label>
+                <label class="form-label">Income / Allowance Stream</label>
                 <select id="setting-inflow-type" class="form-select">
-                  <option value="SALARY">Salary</option>
-                  <option value="POCKET_MONEY">Pocket Money</option>
-                  <option value="STIPEND">Stipend</option>
-                  <option value="FREELANCE">Freelance</option>
+                  <option value="POCKET_MONEY">Pocket Money / Allowance</option>
+                  <option value="SALARY">Salary / Job</option>
+                  <option value="STIPEND">Internship Stipend</option>
+                  <option value="FREELANCE">Freelance / Gigs</option>
                   <option value="OTHER">Other</option>
                 </select>
               </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Expected Monthly Income (₹)</label>
-              <input type="number" id="setting-amount" class="form-input" min="0" step="500" value="45000" required />
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Available Bank Balance / Cash (₹)</label>
+                <input type="number" id="setting-total-balance" class="form-input" min="0" step="100" value="10000" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Fixed Living Bills / Rent / Mess (₹)</label>
+                <input type="number" id="setting-fixed-expenses" class="form-input" min="0" step="100" value="3000" required />
+              </div>
             </div>
-            <button type="submit" class="btn btn-emerald" style="width: 100%;">
-              <span>Save Settings</span>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Emergency Funds Reserve (₹)</label>
+                <input type="number" id="setting-emergency-reserve" class="form-input" min="0" step="100" value="1000" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Expected Monthly Income / Allowance (₹)</label>
+                <input type="number" id="setting-amount" class="form-input" min="0" step="500" value="10000" required />
+              </div>
+            </div>
+
+            <button type="submit" id="btn-save-settings" class="btn btn-emerald" style="width: 100%; margin-top: 8px;">
+              <span>Save Living Setup & Baseline</span>
             </button>
           </form>
         </div>
 
-        <div class="panel">
-          <div class="panel-header">
-            <h3 class="panel-title">Record Income</h3>
+        <!-- Survival Runway & Record Income -->
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <!-- Survival Life Support Runway Box -->
+          <div class="runway-box">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h4 style="font-size: 15px; font-weight: 700; color: #ffffff; margin: 0;">Survival Life Support Runway</h4>
+                <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Calculated from spendable pool + protected emergency reserve</p>
+              </div>
+              <span id="emergency-health-badge" class="tag tag-emerald">Robust</span>
+            </div>
+
+            <div class="grid-2" style="gap: 12px; margin-top: 4px;">
+              <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-dim); font-weight: 600;">Total Life Support</div>
+                <div id="runway-card-total" style="font-size: 22px; font-weight: 700; color: #38bdf8; margin-top: 4px;">0 Days</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Combined liquid longevity</div>
+              </div>
+              <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--text-dim); font-weight: 600;">Spendable Runway</div>
+                <div id="runway-card-disp" style="font-size: 22px; font-weight: 700; color: var(--emerald-light); margin-top: 4px;">0 Days</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Before touching reserve</div>
+              </div>
+            </div>
+
+            <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12px; font-weight: 600; color: #ffffff;">Emergency Fund Health</span>
+                <span id="emergency-coverage-label" style="font-size: 11px; color: var(--emerald-light);">100% of fixed bills</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.5;">
+                Protected emergency reserve adds <strong id="runway-card-reserve" style="color: #6ee7b7;">0 Days</strong> of absolute survival cushion without debt.
+              </div>
+            </div>
           </div>
-          <form onsubmit="handleLogInflow(event)">
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Amount (₹)</label>
-                <input type="number" id="inflow-amount" class="form-input" min="1" required />
+
+          <!-- Record Inflow Panel -->
+          <div class="panel">
+            <div class="panel-header">
+              <h3 class="panel-title">Record Incoming Inflow</h3>
+            </div>
+            <form onsubmit="handleLogInflow(event)">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Amount (₹)</label>
+                  <input type="number" id="inflow-amount" class="form-input" min="1" step="50" placeholder="e.g. 5000" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Type</label>
+                  <select id="inflow-type" class="form-select">
+                    <option value="POCKET_MONEY">Pocket Money</option>
+                    <option value="SALARY">Salary</option>
+                    <option value="FREELANCE">Freelance</option>
+                    <option value="STIPEND">Stipend</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
               </div>
               <div class="form-group">
-                <label class="form-label">Type</label>
-                <select id="inflow-type" class="form-select">
-                  <option value="SALARY">Salary</option>
-                  <option value="FREELANCE">Freelance</option>
-                  <option value="POCKET_MONEY">Pocket Money</option>
-                  <option value="STIPEND">Stipend</option>
-                  <option value="OTHER">Other</option>
-                </select>
+                <label class="form-label">Date</label>
+                <input type="date" id="inflow-date" class="form-input" />
               </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Date</label>
-              <input type="date" id="inflow-date" class="form-input" />
-            </div>
-            <button type="submit" class="btn btn-emerald" style="width: 100%;">
-              <span>Record Income</span>
-            </button>
-          </form>
+              <button type="submit" class="btn btn-emerald" style="width: 100%;">
+                <span>Record Inflow</span>
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </section>
@@ -596,15 +747,76 @@
       document.getElementById("usable-pool-val").innerText = "₹" + Math.round(data.metrics.usable_pool).toLocaleString("en-IN");
       document.getElementById("days-rem-sub").innerText = data.cycle.days_remaining + " days left in cycle";
 
-      document.getElementById("projected-val").innerText = "₹" + Math.round(data.run_rate.projected_total).toLocaleString("en-IN");
-      document.getElementById("run-rate-sub").innerText = "₹" + Math.round(data.run_rate.daily_rate) + "/day average burn";
+      if (document.getElementById("emergency-val") && data.profile) {
+        document.getElementById("emergency-val").innerText = data.profile.formatted_emergency_reserve || ("₹" + Math.round(data.profile.emergency_reserve || 0).toLocaleString("en-IN"));
+      }
+      if (document.getElementById("emergency-sub") && data.survival) {
+        document.getElementById("emergency-sub").innerText = `Buffer: ${data.survival.emergency_health} (${data.survival.emergency_coverage_pct}% of fixed)`;
+      }
+      if (document.getElementById("runway-val") && data.survival) {
+        document.getElementById("runway-val").innerText = `${data.survival.total_runway_days} Days`;
+      }
+      if (document.getElementById("runway-sub") && data.survival) {
+        document.getElementById("runway-sub").innerText = `${data.survival.disposable_runway_days}d pool + ${data.survival.emergency_runway_days}d reserve`;
+      }
 
       document.getElementById("cycle-spent-val").innerText = "₹" + Math.round(data.metrics.spent_this_cycle).toLocaleString("en-IN");
       document.getElementById("emis-pending-sub").innerText = "Pending EMIs: ₹" + Math.round(data.metrics.pending_emis).toLocaleString("en-IN");
 
-      document.getElementById("setting-payday").value = data.settings.payday_day_of_month;
-      document.getElementById("setting-inflow-type").value = data.settings.inflow_type;
-      document.getElementById("setting-amount").value = data.settings.expected_amount;
+      if (data.settings) {
+        document.getElementById("setting-payday").value = data.settings.payday_day_of_month;
+        document.getElementById("setting-inflow-type").value = data.settings.inflow_type;
+        document.getElementById("setting-amount").value = data.settings.expected_amount;
+      }
+
+      if (data.profile) {
+        if (document.getElementById("setting-living-situation")) {
+          document.getElementById("setting-living-situation").value = data.profile.living_situation || "Hosteller Student";
+        }
+        if (document.getElementById("setting-location")) {
+          document.getElementById("setting-location").value = data.profile.location || "Panipat, Haryana";
+          syncLocationChips(data.profile.location || "Panipat, Haryana");
+        }
+        if (document.getElementById("setting-resources")) {
+          document.getElementById("setting-resources").value = data.profile.resources || "";
+          syncResourceChips();
+        }
+        if (document.getElementById("setting-emergency-reserve")) {
+          document.getElementById("setting-emergency-reserve").value = data.profile.emergency_reserve || 0;
+        }
+        if (document.getElementById("setting-fixed-expenses")) {
+          document.getElementById("setting-fixed-expenses").value = data.profile.fixed_expenses || 0;
+        }
+        if (document.getElementById("setting-total-balance")) {
+          document.getElementById("setting-total-balance").value = data.profile.total_balance || 0;
+        }
+        const groqBadge = document.getElementById("groq-profile-badge");
+        if (groqBadge) {
+          groqBadge.style.display = "inline-block";
+          groqBadge.innerText = `📍 ${data.profile.living_situation} • ${data.profile.location}`;
+        }
+      }
+
+      if (data.survival) {
+        const s = data.survival;
+        if (document.getElementById("runway-card-total")) {
+          document.getElementById("runway-card-total").innerText = `${s.total_runway_days} Days`;
+        }
+        if (document.getElementById("runway-card-disp")) {
+          document.getElementById("runway-card-disp").innerText = `${s.disposable_runway_days} Days`;
+        }
+        if (document.getElementById("runway-card-reserve")) {
+          document.getElementById("runway-card-reserve").innerText = `${s.emergency_runway_days} Days`;
+        }
+        if (document.getElementById("emergency-coverage-label")) {
+          document.getElementById("emergency-coverage-label").innerText = `${s.emergency_coverage_pct}% of fixed monthly bills covered`;
+        }
+        const healthBadge = document.getElementById("emergency-health-badge");
+        if (healthBadge) {
+          healthBadge.innerText = s.emergency_health;
+          healthBadge.className = "tag " + (s.emergency_health === "Robust" ? "tag-emerald" : s.emergency_health === "Adequate" ? "tag-amber" : "tag-rose");
+        }
+      }
 
       const catSelect = document.getElementById("exp-cat");
       if (catSelect && catSelect.children.length === 0) {
@@ -817,19 +1029,97 @@
       await loadDashboard();
     }
 
+    function setQuickLocation(city) {
+      const locInput = document.getElementById("setting-location");
+      if (locInput) locInput.value = city;
+      syncLocationChips(city);
+    }
+
+    function syncLocationChips(activeCity) {
+      document.querySelectorAll(".loc-chip").forEach(c => {
+        if (c.dataset.val === activeCity || c.innerText.includes(activeCity.split(",")[0])) {
+          c.classList.add("active");
+        } else {
+          c.classList.remove("active");
+        }
+      });
+    }
+
+    function toggleResourceChip(item) {
+      const resInput = document.getElementById("setting-resources");
+      if (!resInput) return;
+      let items = resInput.value.split(",").map(s => s.trim()).filter(Boolean);
+      const idx = items.findIndex(x => x.toLowerCase() === item.toLowerCase());
+      if (idx >= 0) {
+        items.splice(idx, 1);
+      } else {
+        items.push(item);
+      }
+      resInput.value = items.join(", ");
+      syncResourceChips();
+    }
+
+    function syncResourceChips() {
+      const resInput = document.getElementById("setting-resources");
+      if (!resInput) return;
+      const current = resInput.value.toLowerCase();
+      document.querySelectorAll(".res-chip").forEach(c => {
+        const val = (c.dataset.val || c.innerText).trim().toLowerCase();
+        if (current.includes(val)) {
+          c.classList.add("active");
+        } else {
+          c.classList.remove("active");
+        }
+      });
+    }
+
     async function handleSaveSettings(e) {
       e.preventDefault();
-      const payday_day = parseInt(document.getElementById("setting-payday").value);
+      const payday_day = parseInt(document.getElementById("setting-payday").value) || 1;
       const inflow_type = document.getElementById("setting-inflow-type").value;
-      const expected_amount = parseFloat(document.getElementById("setting-amount").value);
+      const expected_amount = parseFloat(document.getElementById("setting-amount").value) || 0;
+      const living_situation = document.getElementById("setting-living-situation").value;
+      const location = document.getElementById("setting-location").value.trim();
+      const resources = document.getElementById("setting-resources").value.trim();
+      const emergency_reserve = parseFloat(document.getElementById("setting-emergency-reserve").value) || 0;
+      const fixed_expenses = parseFloat(document.getElementById("setting-fixed-expenses").value) || 0;
+      const total_balance = parseFloat(document.getElementById("setting-total-balance").value) || 0;
 
-      await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payday_day, inflow_type, expected_amount, currency: "₹" })
-      });
-      alert("Settings saved.");
-      await loadDashboard();
+      const saveBtn = document.getElementById("btn-save-settings");
+      if (saveBtn) saveBtn.innerText = "Saving Baseline...";
+
+      try {
+        const res = await fetch("/api/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            payday_day,
+            inflow_type,
+            expected_amount,
+            currency: "₹",
+            living_situation,
+            location,
+            resources,
+            emergency_reserve,
+            fixed_expenses,
+            total_balance,
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const alertBox = document.getElementById("settings-alert");
+          if (alertBox) {
+            alertBox.style.display = "block";
+            alertBox.innerText = "✓ Living situation, location & financial baseline saved!";
+            setTimeout(() => { alertBox.style.display = "none"; }, 4000);
+          }
+          await loadDashboard();
+        }
+      } catch (err) {
+        alert("Failed to save settings: " + err.message);
+      } finally {
+        if (saveBtn) saveBtn.innerText = "Save Living Setup & Baseline";
+      }
     }
 
     async function handleLogInflow(e) {

@@ -283,7 +283,7 @@ def get_settings() -> dict[str, Any]:
 
 
 def save_settings(payday_day: int, inflow_type: str, expected_amount: Any, currency: str = "₹",
-                  use_custom_days: int = 0, custom_days_left: int = 30) -> None:
+                  use_custom_days: int = 0, custom_days_left: int = 30, **kwargs: Any) -> None:
     client = get_client()
     if client is None:
         return
@@ -298,7 +298,14 @@ def save_settings(payday_day: int, inflow_type: str, expected_amount: Any, curre
         "custom_days_left": custom_days_left,
         "updated_at": datetime.now().isoformat(),
     }
-    client.table("settings").upsert(payload).execute()
+    for k in ("living_situation", "location", "resources", "emergency_reserve", "fixed_expenses", "total_balance"):
+        if k in kwargs and kwargs[k] is not None:
+            payload[k] = str(kwargs[k])
+
+    try:
+        client.table("settings").upsert(payload).execute()
+    except Exception as exc:
+        logger.debug("Supabase save_settings optional column upsert notice: %s", exc)
 
 
 # ─── Plans ────────────────────────────────────────────────────────────────────

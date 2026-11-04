@@ -218,6 +218,12 @@ def init_db(db_path=DB_PATH) -> None:
         _add_column_if_missing(conn, "expenses", "hour_logged", "INTEGER NOT NULL DEFAULT 12")
         _add_column_if_missing(conn, "settings", "use_custom_days", "INTEGER NOT NULL DEFAULT 0")
         _add_column_if_missing(conn, "settings", "custom_days_left", "INTEGER NOT NULL DEFAULT 30")
+        _add_column_if_missing(conn, "settings", "living_situation", "TEXT NOT NULL DEFAULT 'Hosteller Student'")
+        _add_column_if_missing(conn, "settings", "location", "TEXT NOT NULL DEFAULT 'Panipat, Haryana'")
+        _add_column_if_missing(conn, "settings", "resources", "TEXT NOT NULL DEFAULT 'Electric kettle, mess subscription, induction cooktop'")
+        _add_column_if_missing(conn, "settings", "emergency_reserve", "TEXT NOT NULL DEFAULT '1000'")
+        _add_column_if_missing(conn, "settings", "fixed_expenses", "TEXT NOT NULL DEFAULT '3000'")
+        _add_column_if_missing(conn, "settings", "total_balance", "TEXT NOT NULL DEFAULT '10000'")
 
 
 # ─── Settings ─────────────────────────────────────────────────────────────────
@@ -227,15 +233,25 @@ def _sqlite_get_settings(db_path=DB_PATH) -> dict[str, Any]:
         row = conn.execute("SELECT * FROM settings WHERE id=1").fetchone()
         if row:
             d = dict(row)
-            if "use_custom_days" not in d:
-                d["use_custom_days"] = 0
-            if "custom_days_left" not in d:
-                d["custom_days_left"] = 30
+            d.setdefault("use_custom_days", 0)
+            d.setdefault("custom_days_left", 30)
+            d.setdefault("living_situation", "Hosteller Student")
+            d.setdefault("location", "Panipat, Haryana")
+            d.setdefault("resources", "Electric kettle, mess subscription, induction cooktop")
+            d.setdefault("emergency_reserve", "1000")
+            d.setdefault("fixed_expenses", "3000")
+            d.setdefault("total_balance", "10000")
             return d
         return {
             "payday_day_of_month": 1, "inflow_type": "SALARY",
             "expected_amount": "0", "currency": "₹",
-            "use_custom_days": 0, "custom_days_left": 30
+            "use_custom_days": 0, "custom_days_left": 30,
+            "living_situation": "Hosteller Student",
+            "location": "Panipat, Haryana",
+            "resources": "Electric kettle, mess subscription, induction cooktop",
+            "emergency_reserve": "1000",
+            "fixed_expenses": "3000",
+            "total_balance": "10000",
         }
 
 
@@ -249,21 +265,44 @@ def get_settings(db_path=DB_PATH) -> dict[str, Any]:
 
 
 def _sqlite_save_settings(payday_day: int, inflow_type: str, expected_amount: Any, currency: str = "₹",
-                          use_custom_days: int = 0, custom_days_left: int = 30, db_path=DB_PATH) -> None:
+                          use_custom_days: int = 0, custom_days_left: int = 30,
+                          living_situation: str = "Hosteller Student", location: str = "Panipat, Haryana",
+                          resources: str = "Electric kettle, mess subscription, induction cooktop",
+                          emergency_reserve: Any = "1000", fixed_expenses: Any = "3000",
+                          total_balance: Any = "10000", db_path=DB_PATH) -> None:
     with _connection(db_path) as conn:
         conn.execute(
-            "UPDATE settings SET payday_day_of_month=?, inflow_type=?, expected_amount=?, currency=?, use_custom_days=?, custom_days_left=? WHERE id=1",
-            (payday_day, inflow_type, str(expected_amount), currency, use_custom_days, custom_days_left),
+            """UPDATE settings SET
+                payday_day_of_month=?, inflow_type=?, expected_amount=?, currency=?,
+                use_custom_days=?, custom_days_left=?, living_situation=?, location=?,
+                resources=?, emergency_reserve=?, fixed_expenses=?, total_balance=?
+               WHERE id=1""",
+            (
+                payday_day, inflow_type, str(expected_amount), currency,
+                use_custom_days, custom_days_left, living_situation, location,
+                resources, str(emergency_reserve), str(fixed_expenses), str(total_balance)
+            ),
         )
 
 
 def save_settings(payday_day: int, inflow_type: str, expected_amount: Any, currency: str = "₹",
-                  use_custom_days: int = 0, custom_days_left: int = 30, db_path=DB_PATH) -> None:
+                  use_custom_days: int = 0, custom_days_left: int = 30,
+                  living_situation: str = "Hosteller Student", location: str = "Panipat, Haryana",
+                  resources: str = "Electric kettle, mess subscription, induction cooktop",
+                  emergency_reserve: Any = "1000", fixed_expenses: Any = "3000",
+                  total_balance: Any = "10000", db_path=DB_PATH) -> None:
     # Always persist locally for offline resilience
-    _sqlite_save_settings(payday_day, inflow_type, expected_amount, currency, use_custom_days, custom_days_left, db_path)
+    _sqlite_save_settings(
+        payday_day, inflow_type, expected_amount, currency, use_custom_days, custom_days_left,
+        living_situation, location, resources, emergency_reserve, fixed_expenses, total_balance, db_path
+    )
     if is_supabase_active(db_path):
         try:
-            supabase_backend.save_settings(payday_day, inflow_type, expected_amount, currency, use_custom_days, custom_days_left)
+            supabase_backend.save_settings(
+                payday_day, inflow_type, expected_amount, currency, use_custom_days, custom_days_left,
+                living_situation=living_situation, location=location, resources=resources,
+                emergency_reserve=emergency_reserve, fixed_expenses=fixed_expenses, total_balance=total_balance
+            )
         except Exception as e:
             logger.warning("Supabase save_settings failed: %s", e)
 

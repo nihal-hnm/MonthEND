@@ -64,6 +64,12 @@ CURRENCY = settings.get("currency", "₹")
 PAYDAY = settings.get("payday_day_of_month", 1)
 INFLOW_TYPE = settings.get("inflow_type", "SALARY")
 EXPECTED_AMOUNT = fmoney(settings.get("expected_amount", 0))
+LIVING_SITUATION = settings.get("living_situation", "Hosteller Student")
+LOCATION = settings.get("location", "Panipat, Haryana")
+RESOURCES = settings.get("resources", "Electric kettle, mess subscription, induction cooktop")
+EMERGENCY_RESERVE = fmoney(settings.get("emergency_reserve", 1000))
+FIXED_EXPENSES = fmoney(settings.get("fixed_expenses", 3000))
+TOTAL_BALANCE = fmoney(settings.get("total_balance", 10000))
 
 # ─── Cycle Computation ───────────────────────────────────────────────────────
 
@@ -412,6 +418,24 @@ if check_inflow_overdue(PAYDAY, EXPECTED_AMOUNT):
 with st.sidebar:
     st.markdown("### ⚙️ Command Center")
 
+    with st.expander("🏠 Living Setup & Location", expanded=False):
+        living_options = [
+            "Hosteller Student",
+            "Shared Flat / PG (Cook Yourself)",
+            "PG with Mess / Food Included",
+            "Independent Flat / Studio",
+            "Living with Family / Parents",
+            "Working Professional PG",
+        ]
+        curr_idx = living_options.index(LIVING_SITUATION) if LIVING_SITUATION in living_options else 0
+        new_living = st.selectbox("Where do you live?", living_options, index=curr_idx)
+        new_location = st.text_input("Location (City / State)", value=str(LOCATION), help="e.g. Panipat, Haryana")
+        new_resources = st.text_area(
+            "Available Resources / Appliances",
+            value=str(RESOURCES),
+            help="e.g. Electric kettle, mess subscription, induction cooktop, fridge, bicycle",
+        )
+
     with st.expander("📅 Inflow & Payday Cycle", expanded=False):
         new_payday = st.number_input(
             "Payday / Anchor Day", min_value=1, max_value=28,
@@ -426,33 +450,44 @@ with st.sidebar:
             "Expected Monthly Income (₹)", min_value=0.0,
             value=float(EXPECTED_AMOUNT), step=500.0, format="%.0f",
         )
-        if st.button("Save Cycle Settings", use_container_width=True):
-            database.save_settings(new_payday, new_inflow_type, new_expected)
-            st.success("Cycle settings updated!")
-            st.rerun()
 
     st.markdown("---")
     st.markdown("### 💰 Financial Runway")
     total = st.number_input(
         "Available Cash / Balance (₹)", min_value=0.0,
-        value=float(EXPECTED_AMOUNT or 5000.0), step=500.0, format="%.0f",
+        value=float(TOTAL_BALANCE or EXPECTED_AMOUNT or 5000.0), step=500.0, format="%.0f",
         help="All liquid funds currently at your disposal"
     )
     fixed = st.number_input(
-        "Fixed Living Bills (₹)", min_value=0.0, value=0.0, step=100.0, format="%.0f",
+        "Fixed Living Bills (₹)", min_value=0.0,
+        value=float(FIXED_EXPENSES or 0.0), step=100.0, format="%.0f",
         help="Mandatory living costs (Rent, PG fee, Mess fee, WiFi)"
     )
     reserve = st.number_input(
-        "Protected Emergency Reserve (₹)", min_value=0.0, value=0.0, step=100.0, format="%.0f",
+        "Protected Emergency Reserve (₹)", min_value=0.0,
+        value=float(EMERGENCY_RESERVE or 1000.0), step=100.0, format="%.0f",
         help="Untouchable safety cushion for medical or emergency needs"
     )
 
+    if st.button("Save Baseline & Setup", use_container_width=True):
+        database.save_settings(
+            new_payday, new_inflow_type, new_expected,
+            living_situation=new_living,
+            location=new_location,
+            resources=new_resources,
+            emergency_reserve=Decimal(str(reserve)),
+            fixed_expenses=Decimal(str(fixed)),
+            total_balance=Decimal(str(total)),
+        )
+        st.success("Living setup & baseline updated!")
+        st.rerun()
+
     st.markdown("---")
-    with st.expander("📝 Lifestyle & Context", expanded=False):
+    with st.expander("📝 Lifestyle & Context for Plan", expanded=False):
         plan_name = st.text_input("Plan Name", value="Monthly Survival Plan")
-        pantry = st.text_area("Pantry Staples on Hand", placeholder="Rice, dal, atta, oil, tea, spices…")
-        lifestyle = st.text_input("Living Constraints", placeholder="Student PG, shared fridge, no vehicle…")
-        location = st.text_input("City / Region", placeholder="Bangalore, Mumbai, Delhi, Pune…")
+        pantry = st.text_area("Pantry Staples / Appliances", value=new_resources or str(RESOURCES))
+        lifestyle = st.text_input("Living Constraints", value=new_living or str(LIVING_SITUATION))
+        location = st.text_input("City / Region", value=new_location or str(LOCATION))
 
     with st.expander("📥 Log Incoming Inflow", expanded=False):
         inflow_amt = st.number_input("Inflow Amount (₹)", min_value=0.0, step=500.0, format="%.0f", key="inflow_amt")

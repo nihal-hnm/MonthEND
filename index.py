@@ -101,17 +101,25 @@ def _get_dashboard_data() -> dict[str, Any]:
 
     pending_emis = database.get_pending_emis_total(cycle_start_str, cycle_end_str)
 
-    # Latest plan or dynamic calculation
+    # Living setup & profile baseline from settings
+    living_situation = str(settings.get("living_situation", "Hosteller Student"))
+    location = str(settings.get("location", "Panipat, Haryana"))
+    resources = str(settings.get("resources", "Electric kettle, mess subscription, induction cooktop"))
+    configured_reserve = money(settings.get("emergency_reserve", 1000))
+    configured_fixed = money(settings.get("fixed_expenses", 3000))
+    configured_balance = money(settings.get("total_balance", 10000))
+
+    # Latest plan or settings baseline
     plans = database.list_plans()
     if plans:
         latest_plan = plans[0]
-        reserve = money(latest_plan.get("reserve", 0))
-        fixed = money(latest_plan.get("fixed_expenses", 0))
-        total_pool = money(latest_plan.get("total_money", total_inflow))
+        reserve = money(latest_plan.get("reserve", configured_reserve))
+        fixed = money(latest_plan.get("fixed_expenses", configured_fixed))
+        total_pool = money(latest_plan.get("total_money", configured_balance if configured_balance > 0 else total_inflow))
     else:
-        reserve = Decimal("0.00")
-        fixed = Decimal("0.00")
-        total_pool = total_inflow
+        reserve = configured_reserve
+        fixed = configured_fixed
+        total_pool = configured_balance if configured_balance > 0 else total_inflow
 
     metrics = budget_engine.calculate_budget(
         total_money=total_pool,
@@ -124,6 +132,27 @@ def _get_dashboard_data() -> dict[str, Any]:
     )
 
     daily_status = budget_engine.derive_daily_status(metrics, spent_today)
+
+    # Survival Runway & Emergency Health Metrics
+    daily_burn = metrics.safe_daily_limit if metrics.safe_daily_limit > Decimal("10.00") else max(Decimal("100.00"), metrics.daily_allowance)
+    disposable_runway_days = int(max(Decimal("0.00"), metrics.usable_pool) / daily_burn) if daily_burn > 0 else 0
+    emergency_runway_days = int(max(Decimal("0.00"), metrics.emergency_reserve) / daily_burn) if daily_burn > 0 else 0
+    total_runway_days = disposable_runway_days + emergency_runway_days
+
+    if fixed > 0:
+        emergency_coverage_pct = round(float((reserve / fixed) * 100), 1)
+    else:
+        emergency_coverage_pct = 100.0 if reserve > 0 else 0.0
+
+    if reserve >= (fixed * Decimal("0.50")):
+        emergency_health = "Robust"
+        emergency_health_badge = "emerald"
+    elif reserve >= (fixed * Decimal("0.20")):
+        emergency_health = "Adequate"
+        emergency_health_badge = "amber"
+    else:
+        emergency_health = "Vulnerable"
+        emergency_health_badge = "rose"
 
     # Run-rate & persona
     elapsed_days = max(1, cycle.day_index)
@@ -214,6 +243,25 @@ def _get_dashboard_data() -> dict[str, Any]:
         "goals": goals_data,
         "liabilities": database.list_liabilities(status="ACTIVE"),
         "recent_expenses": all_expenses,
+        "profile": {
+            "living_situation": living_situation,
+            "location": location,
+            "resources": resources,
+            "emergency_reserve": float(reserve),
+            "fixed_expenses": float(fixed),
+            "total_balance": float(total_pool),
+            "formatted_emergency_reserve": format_inr(reserve),
+            "formatted_fixed_expenses": format_inr(fixed),
+            "formatted_total_balance": format_inr(total_pool),
+        },
+        "survival": {
+            "total_runway_days": total_runway_days,
+            "disposable_runway_days": disposable_runway_days,
+            "emergency_runway_days": emergency_runway_days,
+            "emergency_coverage_pct": emergency_coverage_pct,
+            "emergency_health": emergency_health,
+            "emergency_health_badge": emergency_health_badge,
+        },
         "presets": {
             "categories": CATEGORIES,
             "payment_modes": PAYMENT_MODES,
@@ -399,13 +447,29 @@ def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
             new_id = database.add_inflow(amount, in_type, in_date, None, None, note)
             return json_response({"success": True, "id": new_id})
 
-        if path == "/api/settings" and method == "POST":
-            payday_day = int(body_data.get("payday_day", 1))
-            inflow_type = str(body_data.get("inflow_type", "SALARY"))
-            expected_amount = money(body_data.get("expected_amount", 0))
-            currency = str(body_data.get("currency", "₹"))
+        if path in ("/api/settings", "/api/profile") and method == "POST":
+            current_settings = database.get_settings()
+            payday_day = int(body_data.get("payday_day", current_settings.get("payday_day_of_month", 1)))
+            inflow_type = str(body_data.get("inflow_type", current_settings.get("inflow_type", "SALARY")))
+            expected_amount = money(body_data.get("expected_amount", current_settings.get("expected_amount", 0)))
+            currency = str(body_data.get("currency", current_settings.get("currency", "₹")))
 
-            database.save_settings(payday_day, inflow_type, expected_amount, currency)
+            living_situation = str(body_data.get("living_situation", current_settings.get("living_situation", "Hosteller Student"))).strip()
+            location = str(body_data.get("location", current_settings.get("location", "Panipat, Haryana"))).strip()
+            resources = str(body_data.get("resources", current_settings.get("resources", "Electric kettle, mess subscription, induction cooktop"))).strip()
+            emergency_reserve = money(body_data.get("emergency_reserve", current_settings.get("emergency_reserve", 1000)))
+            fixed_expenses = money(body_data.get("fixed_expenses", current_settings.get("fixed_expenses", 3000)))
+            total_balance = money(body_data.get("total_balance", current_settings.get("total_balance", 10000)))
+
+            database.save_settings(
+                payday_day, inflow_type, expected_amount, currency,
+                living_situation=living_situation,
+                location=location,
+                resources=resources,
+                emergency_reserve=emergency_reserve,
+                fixed_expenses=fixed_expenses,
+                total_balance=total_balance,
+            )
             return json_response({"success": True})
 
         # ─── External Groq AI Guidance ─────────────────────────────────────────
@@ -428,11 +492,20 @@ def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
             try:
                 advice, _ = llm_client.generate_advice(
                     metrics_obj,
+                    pantry=dash["profile"]["resources"],
+                    lifestyle=dash["profile"]["living_situation"],
+                    location=dash["profile"]["location"],
                     cycle_context=cycle_ctx,
                     liabilities_context=f"Pending EMIs: ₹{dash['metrics']['pending_emis']}",
                 )
                 used_model = advice.get("_model", getattr(llm_client, "DEFAULT_MODEL", "groq-cloud"))
-                return json_response({"success": True, "advice": advice, "model": used_model})
+                return json_response({
+                    "success": True,
+                    "advice": advice,
+                    "model": used_model,
+                    "location": dash["profile"]["location"],
+                    "lifestyle": dash["profile"]["living_situation"],
+                })
             except Exception as exc:
                 logger.warning("Groq AI guidance failed, returning static guide: %s", exc)
                 return json_response({"success": True, "advice": llm_client.STATIC_GUIDE, "model": "fallback", "error": str(exc)})
