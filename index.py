@@ -166,6 +166,10 @@ def _get_dashboard_data() -> dict[str, Any]:
 
     # Savings Goals Progress
     raw_goals = database.list_savings_goals(status="ACTIVE")
+    total_savings_locked = sum((Decimal(str(g.get("current_amount", "0"))) for g in raw_goals), Decimal("0.00"))
+    spendable_amount = max(Decimal("0.00"), metrics.true_disposable - spent_this_cycle)
+    net_total_funds = total_pool + reserve + total_savings_locked
+
     median_surplus = analytics_engine.get_median_monthly_surplus(payday_day)
     goal_progress_list = [savings_engine.compute_goal_progress(g) for g in raw_goals]
     checked_goals = savings_engine.feasibility_check(goal_progress_list, median_surplus)
@@ -210,6 +214,10 @@ def _get_dashboard_data() -> dict[str, Any]:
             "currency": settings.get("currency", "₹"),
         },
         "metrics": {
+            "net_balance": float(total_pool),
+            "spendable_amount": float(spendable_amount),
+            "total_savings_locked": float(total_savings_locked),
+            "net_total_funds": float(net_total_funds),
             "safe_daily_limit": float(metrics.safe_daily_limit),
             "usable_pool": float(metrics.usable_pool),
             "true_disposable": float(metrics.true_disposable),
@@ -225,6 +233,10 @@ def _get_dashboard_data() -> dict[str, Any]:
             "pending_emis": float(pending_emis),
             "feasible": metrics.feasible,
             "critical": metrics.critical,
+            "formatted_net_balance": format_inr(total_pool),
+            "formatted_spendable": format_inr(spendable_amount),
+            "formatted_savings_locked": format_inr(total_savings_locked),
+            "formatted_net_total": format_inr(net_total_funds),
             "formatted_safe_daily": format_inr(metrics.safe_daily_limit),
             "formatted_usable": format_inr(metrics.usable_pool),
             "formatted_spent_cycle": format_inr(spent_this_cycle),
@@ -413,11 +425,12 @@ def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
             target = money(body_data.get("target_amount", 0))
             deadline = body_data.get("deadline") or None
             priority = int(body_data.get("priority", 1))
+            initial_amount = money(body_data.get("initial_amount", 0))
 
             if not name or target <= 0:
                 return json_response({"error": "Goal name and target amount required"}, "400 Bad Request")
 
-            new_id = database.add_savings_goal(name, target, deadline, priority)
+            new_id = database.add_savings_goal(name, target, deadline, priority, initial_amount)
             return json_response({"success": True, "id": new_id})
 
         if path == "/api/savings/transfer" and method == "POST":

@@ -626,6 +626,20 @@ def delete_savings_goal(goal_id: int) -> None:
     client = get_client()
     if client is None:
         return
+    try:
+        goal_res = client.table("savings_goals").select("current_amount").eq("id", goal_id).execute()
+        g_rows = _as_list_dicts(goal_res.data)
+        if g_rows:
+            saved_amt = Decimal(str(g_rows[0].get("current_amount", "0")))
+            if saved_amt > 0:
+                settings_res = client.table("settings").select("total_balance").eq("id", 1).execute()
+                s_rows = _as_list_dicts(settings_res.data)
+                if s_rows:
+                    cur_bal = Decimal(str(s_rows[0].get("total_balance", "0")))
+                    new_bal = cur_bal + saved_amt
+                    client.table("settings").update({"total_balance": str(new_bal)}).eq("id", 1).execute()
+    except Exception as e:
+        logger.warning("Supabase refund on delete_savings_goal failed: %s", e)
     client.table("savings_goals").delete().eq("id", goal_id).execute()
 
 
@@ -639,9 +653,10 @@ def add_savings_transfer(goal_id: int, amount: Any, transfer_date: Optional[str]
     if transfer_date is None:
         transfer_date = date.today().isoformat()
 
+    amt_decimal = Decimal(str(amount))
     payload: dict[str, Any] = {
         "goal_id": goal_id,
-        "amount": str(amount),
+        "amount": str(amt_decimal),
         "date": transfer_date,
     }
     res = client.table("savings_transfers").insert(payload).execute()
@@ -652,12 +667,23 @@ def add_savings_transfer(goal_id: int, amount: Any, transfer_date: Optional[str]
     g_rows = _as_list_dicts(goal_res.data)
     if g_rows:
         g = g_rows[0]
-        cur_amt = Decimal(str(g.get("current_amount", "0"))) + Decimal(str(amount))
+        cur_amt = Decimal(str(g.get("current_amount", "0"))) + amt_decimal
         target_amt = Decimal(str(g.get("target_amount", "0")))
         up_data: dict[str, Any] = {"current_amount": str(cur_amt)}
         if cur_amt >= target_amt:
             up_data["status"] = "REACHED"
         client.table("savings_goals").update(up_data).eq("id", goal_id).execute()
+
+    # Deduct from settings total_balance
+    try:
+        settings_res = client.table("settings").select("total_balance").eq("id", 1).execute()
+        s_rows = _as_list_dicts(settings_res.data)
+        if s_rows:
+            cur_bal = Decimal(str(s_rows[0].get("total_balance", "0")))
+            new_bal = max(Decimal("0.00"), cur_bal - amt_decimal)
+            client.table("settings").update({"total_balance": str(new_bal)}).eq("id", 1).execute()
+    except Exception as e:
+        logger.warning("Supabase deduct total_balance on transfer failed: %s", e)
 
     return new_id
 

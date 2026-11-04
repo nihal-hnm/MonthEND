@@ -536,11 +536,12 @@ if money(total) - money(fixed) <= 0:
 # ─── KPI Dashboard Cards ──────────────────────────────────────────────────────
 
 kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
-kpi1.metric("Total Liquid", format_inr(metrics.total_money))
-kpi2.metric("After Bills", format_inr(max(Decimal("0"), metrics.total_money - metrics.fixed_expenses)))
+spendable_rem = max(Decimal("0.00"), metrics.true_disposable - spent_this_cycle)
+kpi1.metric("Net Balance in Hand", format_inr(metrics.total_money), help="Liquid balance in bank/hand (deducted when saving to goals)")
+kpi2.metric("Spendable Amount", format_inr(spendable_rem), help="Current spendable cash pool remaining this cycle")
 kpi3.metric(
-    "True Disposable", format_inr(metrics.true_disposable),
-    help="Actual spendable cash after deducting fixed bills, protected emergency reserve, and pending BNPL/EMIs."
+    "Emergency Reserve", format_inr(metrics.emergency_reserve),
+    help="Protected reserve buffer untouched by daily burn."
 )
 kpi4.metric(
     "Safe Daily Limit", format_inr(metrics.safe_daily_limit),

@@ -628,15 +628,21 @@ def _sqlite_add_savings_goal(name: str, target_amount: Any, deadline: Optional[s
         return cur.lastrowid or 0
 
 
-def add_savings_goal(name: str, target_amount: Any, deadline: Optional[str] = None, priority: int = 1, db_path=DB_PATH) -> int:
+def add_savings_goal(name: str, target_amount: Any, deadline: Optional[str] = None, priority: int = 1, initial_amount: Any = 0, db_path=DB_PATH) -> int:
+    init_amt = Decimal(str(initial_amount or 0))
     if is_supabase_active(db_path):
         try:
             cloud_id = supabase_backend.add_savings_goal(name, target_amount, deadline, priority)
             if cloud_id:
+                if init_amt > 0:
+                    add_savings_transfer(cloud_id, init_amt, db_path=db_path)
                 return cloud_id
         except Exception as e:
             logger.warning("Supabase add_savings_goal failed: %s", e)
-    return _sqlite_add_savings_goal(name, target_amount, deadline, priority, db_path)
+    goal_id = _sqlite_add_savings_goal(name, target_amount, deadline, priority, db_path)
+    if goal_id and init_amt > 0:
+        add_savings_transfer(goal_id, init_amt, db_path=db_path)
+    return goal_id
 
 
 def list_savings_goals(status: Optional[str] = "ACTIVE", db_path=DB_PATH) -> list[dict[str, Any]]:
@@ -683,6 +689,15 @@ def delete_savings_goal(goal_id: int, db_path=DB_PATH) -> None:
         except Exception as e:
             logger.warning("Supabase delete_savings_goal failed: %s", e)
     with _connection(db_path) as conn:
+        # Refund saved amount back to total balance if deleting goal
+        row = conn.execute("SELECT current_amount FROM savings_goals WHERE id=?", (goal_id,)).fetchone()
+        if row and row["current_amount"]:
+            saved_amt = Decimal(str(row["current_amount"]))
+            if saved_amt > 0:
+                settings_row = conn.execute("SELECT total_balance FROM settings WHERE id=1").fetchone()
+                if settings_row and settings_row["total_balance"]:
+                    current_total = Decimal(str(settings_row["total_balance"]))
+                    conn.execute("UPDATE settings SET total_balance=? WHERE id=1", (str(current_total + saved_amt),))
         conn.execute("DELETE FROM savings_goals WHERE id=?", (goal_id,))
 
 
@@ -691,18 +706,27 @@ def delete_savings_goal(goal_id: int, db_path=DB_PATH) -> None:
 def _sqlite_add_savings_transfer(goal_id: int, amount: Any, transfer_date: Optional[str] = None, db_path=DB_PATH) -> int:
     if transfer_date is None:
         transfer_date = date.today().isoformat()
+    amt_decimal = Decimal(str(amount))
     with _connection(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO savings_transfers(goal_id,amount,date) VALUES(?,?,?)",
-            (goal_id, str(amount), transfer_date),
+            (goal_id, str(amt_decimal), transfer_date),
         )
         row = conn.execute("SELECT current_amount FROM savings_goals WHERE id=?", (goal_id,)).fetchone()
         if row:
-            new_amt = Decimal(row["current_amount"]) + Decimal(str(amount))
+            new_amt = Decimal(row["current_amount"]) + amt_decimal
             conn.execute("UPDATE savings_goals SET current_amount=? WHERE id=?", (str(new_amt), goal_id))
             target_row = conn.execute("SELECT target_amount FROM savings_goals WHERE id=?", (goal_id,)).fetchone()
             if target_row and new_amt >= Decimal(target_row["target_amount"]):
                 conn.execute("UPDATE savings_goals SET status='REACHED' WHERE id=?", (goal_id,))
+
+        # Deduct the logged savings amount from total_balance in settings
+        settings_row = conn.execute("SELECT total_balance FROM settings WHERE id=1").fetchone()
+        if settings_row and settings_row["total_balance"]:
+            current_total = Decimal(str(settings_row["total_balance"]))
+            new_total = max(Decimal("0.00"), current_total - amt_decimal)
+            conn.execute("UPDATE settings SET total_balance=? WHERE id=1", (str(new_total),))
+
         return cur.lastrowid or 0
 
 

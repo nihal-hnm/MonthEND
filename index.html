@@ -261,15 +261,20 @@
   <main>
     <!-- Executive KPI Row -->
     <section class="kpi-grid">
+      <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
+        <div class="kpi-title">Net Balance We Have</div>
+        <div class="kpi-value" id="net-balance-val" style="color: #38bdf8;">₹0</div>
+        <div class="kpi-sub" id="net-balance-sub">Liquid cash · Goals: ₹0</div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid var(--emerald);">
+        <div class="kpi-title">Spendable Amount</div>
+        <div class="kpi-value" id="spendable-val" style="color: var(--emerald-light);">₹0</div>
+        <div class="kpi-sub" id="spendable-sub">Unencumbered burn pool</div>
+      </div>
       <div class="kpi-card">
         <div class="kpi-title">Safe Daily Limit</div>
         <div class="kpi-value" id="safe-daily-val">₹0</div>
         <div class="kpi-sub" id="today-spent-sub">Spent today: ₹0</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-title">Spendable Pool</div>
-        <div class="kpi-value" id="usable-pool-val">₹0</div>
-        <div class="kpi-sub" id="days-rem-sub">0 days left in cycle</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-title">Emergency Reserve</div>
@@ -278,7 +283,7 @@
       </div>
       <div class="kpi-card">
         <div class="kpi-title">Survival Runway</div>
-        <div class="kpi-value" id="runway-val" style="color: #38bdf8;">0 Days</div>
+        <div class="kpi-value" id="runway-val" style="color: #a78bfa;">0 Days</div>
         <div class="kpi-sub" id="runway-sub">At safe daily burn</div>
       </div>
       <div class="kpi-card">
@@ -463,27 +468,45 @@
           <form onsubmit="handleCreateGoal(event)">
             <div class="form-group">
               <label class="form-label">Goal Name</label>
-              <input type="text" id="goal-name" class="form-input" placeholder="e.g. Emergency Fund" required />
+              <input type="text" id="goal-name" class="form-input" placeholder="e.g. New Laptop or Emergency Fund" required />
             </div>
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Target Amount (₹)</label>
-                <input type="number" id="goal-target" class="form-input" min="100" step="100" required />
+                <input type="number" id="goal-target" class="form-input" min="100" step="100" placeholder="e.g. 15000" required />
               </div>
               <div class="form-group">
                 <label class="form-label">Target Deadline</label>
                 <input type="date" id="goal-deadline" class="form-input" />
               </div>
             </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Initial Deposit (₹) <span style="font-size: 11px; color: var(--text-dim);">(Deducted from balance)</span></label>
+                <input type="number" id="goal-initial" class="form-input" min="0" step="50" placeholder="0 (optional)" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Priority</label>
+                <select id="goal-priority" class="form-select">
+                  <option value="1">High Priority</option>
+                  <option value="2">Medium Priority</option>
+                  <option value="3">Low Priority</option>
+                </select>
+              </div>
+            </div>
             <button type="submit" class="btn btn-emerald" style="width: 100%;">
-              <span>Save Goal</span>
+              <span>Create Savings Goal</span>
             </button>
           </form>
         </div>
 
         <div class="panel">
           <div class="panel-header">
-            <h3 class="panel-title">Savings Goals</h3>
+            <div>
+              <h3 class="panel-title">Active Savings Goals</h3>
+              <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Amounts saved deduct directly from your liquid balance</p>
+            </div>
+            <span id="savings-locked-badge" class="tag tag-emerald">Locked: ₹0</span>
           </div>
           <div id="goals-container" style="display: flex; flex-direction: column; gap: 12px;">
             <div style="color: var(--text-dim); text-align: center; padding: 20px;">No goals recorded yet.</div>
@@ -754,11 +777,22 @@
       document.getElementById("cycle-label").innerText = data.cycle.status_text;
       document.getElementById("cycle-bar").style.width = data.cycle.progress_pct + "%";
 
+      if (document.getElementById("net-balance-val") && data.metrics) {
+        document.getElementById("net-balance-val").innerText = data.metrics.formatted_net_balance || ("₹" + Math.round(data.metrics.net_balance).toLocaleString("en-IN"));
+      }
+      if (document.getElementById("net-balance-sub") && data.metrics) {
+        document.getElementById("net-balance-sub").innerText = `Liquid cash · Goals: ${data.metrics.formatted_savings_locked || '₹0'}`;
+      }
+
+      if (document.getElementById("spendable-val") && data.metrics) {
+        document.getElementById("spendable-val").innerText = data.metrics.formatted_spendable || ("₹" + Math.round(data.metrics.spendable_amount).toLocaleString("en-IN"));
+      }
+      if (document.getElementById("spendable-sub") && data.metrics) {
+        document.getElementById("spendable-sub").innerText = `${data.cycle.days_remaining}d left · Pool: ${data.metrics.formatted_usable || '₹0'}`;
+      }
+
       document.getElementById("safe-daily-val").innerText = "₹" + Math.round(data.metrics.safe_daily_limit).toLocaleString("en-IN");
       document.getElementById("today-spent-sub").innerText = "Spent today: ₹" + Math.round(data.metrics.spent_today).toLocaleString("en-IN");
-
-      document.getElementById("usable-pool-val").innerText = "₹" + Math.round(data.metrics.usable_pool).toLocaleString("en-IN");
-      document.getElementById("days-rem-sub").innerText = data.cycle.days_remaining + " days left in cycle";
 
       if (document.getElementById("emergency-val") && data.profile) {
         document.getElementById("emergency-val").innerText = data.profile.formatted_emergency_reserve || ("₹" + Math.round(data.profile.emergency_reserve || 0).toLocaleString("en-IN"));
@@ -883,6 +917,9 @@
       }
 
       const goalsContainer = document.getElementById("goals-container");
+      if (document.getElementById("savings-locked-badge") && data.metrics) {
+        document.getElementById("savings-locked-badge").innerText = `Locked: ${data.metrics.formatted_savings_locked || '₹0'}`;
+      }
       if (data.goals.length === 0) {
         goalsContainer.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 20px;">No goals recorded yet.</div>`;
       } else {
@@ -899,9 +936,15 @@
               <span>${g.formatted_current} of ${g.formatted_target} (${g.pct}%)</span>
               <span>Needed: ₹${Math.round(g.monthly_needed)}/mo</span>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
-              <button class="btn btn-emerald btn-sm" onclick="handleTransferToGoal(${g.goal_id})">Add ₹500</button>
-              <button class="btn btn-danger btn-sm" onclick="handleDeleteGoal(${g.goal_id})">Delete</button>
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; margin-top:4px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.06);">
+              <span style="font-size:11px; color:var(--text-dim);">Save to goal (deducts from net balance):</span>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button class="btn btn-emerald btn-sm" onclick="handleTransferToGoal(${g.goal_id}, 250)">+ ₹250</button>
+                <button class="btn btn-emerald btn-sm" onclick="handleTransferToGoal(${g.goal_id}, 500)">+ ₹500</button>
+                <button class="btn btn-emerald btn-sm" onclick="handleTransferToGoal(${g.goal_id}, 1000)">+ ₹1,000</button>
+                <button class="btn btn-sm" onclick="handleTransferCustom(${g.goal_id})">+ Custom</button>
+                <button class="btn btn-danger btn-sm" title="Delete goal and refund saved money to balance" onclick="handleDeleteGoal(${g.goal_id})">Delete</button>
+              </div>
             </div>
           </div>
         `).join("");
@@ -1013,31 +1056,72 @@
 
     async function handleCreateGoal(e) {
       e.preventDefault();
-      const name = document.getElementById("goal-name").value;
+      const name = document.getElementById("goal-name").value.trim();
       const target_amount = parseFloat(document.getElementById("goal-target").value);
       const deadline = document.getElementById("goal-deadline").value || null;
+      const initial_amount = parseFloat(document.getElementById("goal-initial")?.value) || 0;
+      const priority = parseInt(document.getElementById("goal-priority")?.value) || 1;
 
-      await fetch("/api/savings", {
+      const netBal = DASHBOARD_DATA?.metrics?.net_balance || 0;
+      if (initial_amount > 0 && initial_amount > netBal) {
+        const proceed = confirm(`Warning: Initial deposit of ₹${initial_amount} exceeds your current net balance of ₹${Math.round(netBal).toLocaleString("en-IN")}.\n\nSaving will reduce your net balance to ₹0. Proceed?`);
+        if (!proceed) return;
+      }
+
+      const res = await fetch("/api/savings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, target_amount, deadline })
+        body: JSON.stringify({ name, target_amount, deadline, priority, initial_amount })
       });
-      document.getElementById("goal-name").value = "";
-      document.getElementById("goal-target").value = "";
-      await loadDashboard();
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById("goal-name").value = "";
+        document.getElementById("goal-target").value = "";
+        if (document.getElementById("goal-initial")) document.getElementById("goal-initial").value = "";
+        await loadDashboard();
+      } else {
+        alert("Failed to create goal: " + (data.error || "Unknown error"));
+      }
     }
 
-    async function handleTransferToGoal(goal_id) {
-      await fetch("/api/savings/transfer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal_id, amount: 500 })
-      });
-      await loadDashboard();
+    async function handleTransferToGoal(goal_id, amount = 500) {
+      if (!amount || amount <= 0) return;
+      const netBal = DASHBOARD_DATA?.metrics?.net_balance || 0;
+      if (amount > netBal) {
+        const proceed = confirm(`Warning: You have ₹${Math.round(netBal).toLocaleString("en-IN")} in net balance.\n\nTransferring ₹${amount} will reduce your net balance to ₹0. Proceed?`);
+        if (!proceed) return;
+      }
+      try {
+        const res = await fetch("/api/savings/transfer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ goal_id, amount })
+        });
+        const data = await res.json();
+        if (data.success) {
+          await loadDashboard();
+        } else {
+          alert("Transfer failed: " + (data.error || "Unknown error"));
+        }
+      } catch (err) {
+        alert("Transfer error: " + err.message);
+      }
+    }
+
+    async function handleTransferCustom(goal_id) {
+      const netBal = DASHBOARD_DATA?.metrics?.net_balance || 0;
+      const val = prompt(`Enter amount to save towards this goal (Current net balance: ₹${Math.round(netBal).toLocaleString("en-IN")}):`, "500");
+      if (!val) return;
+      const amount = parseFloat(val);
+      if (isNaN(amount) || amount <= 0) {
+        alert("Please enter a valid positive number.");
+        return;
+      }
+      await handleTransferToGoal(goal_id, amount);
     }
 
     async function handleDeleteGoal(id) {
-      if (!confirm("Delete this savings goal?")) return;
+      if (!confirm("Delete this savings goal? Any saved amount will be refunded back to your net balance.")) return;
       await fetch("/api/savings?id=" + id, { method: "DELETE" });
       await loadDashboard();
     }
