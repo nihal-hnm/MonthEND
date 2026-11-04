@@ -447,6 +447,10 @@ def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
             new_id = database.add_inflow(amount, in_type, in_date, None, None, note)
             return json_response({"success": True, "id": new_id})
 
+        if path == "/api/reset" and method in ("POST", "DELETE"):
+            database.clear_all_data()
+            return json_response({"success": True, "message": "All user data reset to zero."})
+
         if path in ("/api/settings", "/api/profile") and method == "POST":
             current_settings = database.get_settings()
             payday_day = int(body_data.get("payday_day", current_settings.get("payday_day_of_month", 1)))

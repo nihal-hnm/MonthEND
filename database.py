@@ -221,9 +221,9 @@ def init_db(db_path=DB_PATH) -> None:
         _add_column_if_missing(conn, "settings", "living_situation", "TEXT NOT NULL DEFAULT 'Hosteller Student'")
         _add_column_if_missing(conn, "settings", "location", "TEXT NOT NULL DEFAULT 'Panipat, Haryana'")
         _add_column_if_missing(conn, "settings", "resources", "TEXT NOT NULL DEFAULT 'Electric kettle, mess subscription, induction cooktop'")
-        _add_column_if_missing(conn, "settings", "emergency_reserve", "TEXT NOT NULL DEFAULT '1000'")
-        _add_column_if_missing(conn, "settings", "fixed_expenses", "TEXT NOT NULL DEFAULT '3000'")
-        _add_column_if_missing(conn, "settings", "total_balance", "TEXT NOT NULL DEFAULT '10000'")
+        _add_column_if_missing(conn, "settings", "emergency_reserve", "TEXT NOT NULL DEFAULT '0'")
+        _add_column_if_missing(conn, "settings", "fixed_expenses", "TEXT NOT NULL DEFAULT '0'")
+        _add_column_if_missing(conn, "settings", "total_balance", "TEXT NOT NULL DEFAULT '0'")
 
 
 # ─── Settings ─────────────────────────────────────────────────────────────────
@@ -743,9 +743,14 @@ def clear_all_data(db_path=DB_PATH) -> None:
         conn.execute("DELETE FROM liabilities")
         conn.execute("DELETE FROM savings_transfers")
         conn.execute("DELETE FROM savings_goals")
-        conn.execute("UPDATE settings SET payday_day_of_month=1, inflow_type='SALARY', expected_amount='0', currency='₹', use_custom_days=0, custom_days_left=30 WHERE id=1")
+        conn.execute(
+            "UPDATE settings SET payday_day_of_month=1, inflow_type='SALARY', "
+            "expected_amount='0', currency='₹', use_custom_days=0, custom_days_left=30, "
+            "emergency_reserve='0', fixed_expenses='0', total_balance='0' "
+            "WHERE id=1"
+        )
         conn.execute("DELETE FROM sqlite_sequence")
-    if is_supabase_active(db_path):
+    if is_supabase_active(db_path) or supabase_backend.is_configured():
         try:
             supabase_backend.clear_all_data()
         except Exception as e:

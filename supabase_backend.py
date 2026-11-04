@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 CONFIG_FILE = Path(__file__).with_name("supabase_config.json")
 ENV_FILE = Path(__file__).with_name(".env")
@@ -679,23 +682,37 @@ def clear_all_data() -> None:
     if client is None:
         return
 
-    # Delete all rows from child and parent tables using .neq('id', -1)
-    client.table("savings_transfers").delete().neq("id", -1).execute()
-    client.table("savings_goals").delete().neq("id", -1).execute()
-    client.table("liability_payments").delete().neq("id", -1).execute()
-    client.table("liabilities").delete().neq("id", -1).execute()
-    client.table("expenses").delete().neq("id", -1).execute()
-    client.table("plans").delete().neq("id", -1).execute()
-    client.table("inflows").delete().neq("id", -1).execute()
-    client.table("settings").upsert({
-        "id": 1,
-        "payday_day_of_month": 1,
-        "inflow_type": "SALARY",
-        "expected_amount": "0",
-        "currency": "₹",
-        "use_custom_days": 0,
-        "custom_days_left": 30,
-    }).execute()
+    # Delete all rows from each table safely
+    tables = [
+        "savings_transfers",
+        "savings_goals",
+        "liability_payments",
+        "liabilities",
+        "expenses",
+        "plans",
+        "inflows",
+    ]
+    for table_name in tables:
+        try:
+            client.table(table_name).delete().neq("id", -1).execute()
+        except Exception as e:
+            logger.debug("Supabase clear table %s: %s", table_name, e)
+
+    try:
+        client.table("settings").upsert({
+            "id": 1,
+            "payday_day_of_month": 1,
+            "inflow_type": "SALARY",
+            "expected_amount": "0",
+            "currency": "₹",
+            "use_custom_days": 0,
+            "custom_days_left": 30,
+            "emergency_reserve": "0",
+            "fixed_expenses": "0",
+            "total_balance": "0",
+        }).execute()
+    except Exception as e:
+        logger.debug("Supabase clear settings: %s", e)
 
 
 # ─── Sync & Migration Tools ──────────────────────────────────────────────────
