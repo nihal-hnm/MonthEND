@@ -1,2 +1,8 @@
-[tool.vercel]
-entrypoint = "index:app"
+[project]
+name = "monthend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.31",
+    "supabase>=2.34.0",
+]

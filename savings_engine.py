@@ -3,6 +3,8 @@
 Handles monthly allocation, feasibility checks, milestone tracking,
 and internal fund transfers.
 """
+from __future__ import annotations
+
 from datetime import date
 from decimal import Decimal
 from typing import NamedTuple

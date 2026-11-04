@@ -52,6 +52,7 @@ def _read_html_file(filename: str) -> bytes | None:
         Path(__file__).resolve().parent / filename,
         Path.cwd() / filename,
         Path(filename),
+        Path(__file__).resolve().parent.parent / filename,
     ]
     for p in candidates:
         if p.is_file():

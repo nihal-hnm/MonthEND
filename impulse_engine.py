@@ -5,6 +5,8 @@ Heuristics:
   2. Late-night (23:00–04:00) food/shopping → auto-flag
   3. 5-second cooldown review for flagged high-velocity spends
 """
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 
