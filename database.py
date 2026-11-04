@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 import time
+import os
 from contextlib import contextmanager
 from datetime import date, datetime
 from decimal import Decimal
@@ -21,7 +22,7 @@ import supabase_backend
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(__file__).with_name("survival_budget.db")
+DB_PATH = Path("/tmp/survival_budget.db") if os.environ.get("VERCEL") else Path(__file__).with_name("survival_budget.db")
 
 
 # ─── Backend Selection ────────────────────────────────────────────────────────
