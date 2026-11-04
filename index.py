@@ -1,9 +1,8 @@
-"""Native Vercel Serverless Web Application for MonthEnd Sovereign FinTech.
+"""Native Vercel Web Application for MonthEnd Personal Budgeting.
 
 Self-contained WSGI web server providing both:
-1. Dynamic Single-Page FinTech Application at GET /
+1. Single-Page Application at GET /
 2. Complete REST API endpoints (/api/dashboard, /api/expenses, /api/liabilities, /api/savings, /api/settings)
-Directly executes on Vercel without Streamlit or external dependencies.
 """
 from __future__ import annotations
 

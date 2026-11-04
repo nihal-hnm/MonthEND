@@ -84,13 +84,13 @@ KEY FEATURES
 
 
 
-* Local AI & Spending Personas:
+* Spending Trends & Patterns:
 
   Categorizes spending behavior (e.g., "Weekend Spiker", "Mid-Month Burner") 
 
   and offers hyper-local insights tailored for Indian everyday expenses 
 
-  (mess/tiffin, kirana, transit) powered by an on-device AI.
+  (mess/tiffin, kirana, transit).
 
 
 

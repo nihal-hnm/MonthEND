@@ -334,7 +334,7 @@ with header_col1:
                      background: {'#e0f2fe' if is_light else '#1e293b'}; 
                      color: {'#0369a1' if is_light else '#38bdf8'}; 
                      border: 1px solid {'#bae6fd' if is_light else '#334155'};">
-            AIR-GAPPED SOVEREIGN FINTECH
+            MONTHEND BUDGET
         </span>
     </div>
     <div style="font-size: 0.95rem; color: {'#64748b' if is_light else '#94a3b8'}; margin-bottom: 12px;">
@@ -523,13 +523,13 @@ if metrics.critical and metrics.usable_pool > 0:
 # ─── Workspace Tabs ───────────────────────────────────────────────────────────
 
 tab_dash, tab_log, tab_lia, tab_save, tab_analytics, tab_plan, tab_history = st.tabs([
-    "📊 Command Dashboard",
-    "⚡ Quick Entry Log",
-    "🏦 EMI & Liabilities",
-    "🎯 Savings & Wishlist",
-    "📈 Predictive Analytics",
-    "🧠 Local AI Guidance",
-    "📋 Passbook History",
+    "📊 Dashboard",
+    "➕ Log Expense",
+    "🏦 Liabilities & EMI",
+    "🎯 Savings Goals",
+    "📈 Analytics",
+    "📋 Budget Guidance",
+    "📜 History",
 ])
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1010,8 +1010,8 @@ with tab_analytics:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 with tab_plan:
-    st.markdown("#### 🧠 Sovereign AI Financial Guidance")
-    st.caption("Powered entirely by on-device local LLM execution via Ollama (zero cloud telemetry, 100% private).")
+    st.markdown("#### 📋 Budget & Meal Planning Guidance")
+    st.caption("Practical guidelines based on your cycle numbers and spending allowances.")
 
     can_generate = metrics.feasible and metrics.usable_pool > 0
 
@@ -1020,11 +1020,11 @@ with tab_plan:
         st.session_state.advice_source = "static"
 
     if st.button(
-        "🧠 Synthesize Personalized Guidance", type="primary",
+        "Generate Budget Guidance", type="primary",
         disabled=not can_generate,
         help=None if can_generate else "A positive usable balance is required.",
     ):
-        with st.spinner("Analyzing budget heuristics and generating sovereign advice..."):
+        with st.spinner("Generating budget recommendations..."):
             try:
                 cycle_ctx = f"Day {cycle.day_index}/{cycle.total_days}, {cycle.days_remaining} days left"
                 lia_ctx = f"Pending EMIs: {format_inr(pending_emis)}" if pending_emis > 0 else None
@@ -1054,7 +1054,7 @@ with tab_plan:
         st.info("Displaying standard survival framework based on your numbers.")
 
     advice = st.session_state.advice
-    st.markdown(f"**Executive Synthesis:** {advice.get('summary', STATIC_GUIDE['summary'])}")
+    st.markdown(f"**Summary:** {advice.get('summary', STATIC_GUIDE['summary'])}")
 
     sections = [
         ("🍳 Meal Framework", "meal_plan"),
@@ -1141,7 +1141,7 @@ with tab_history:
 st.markdown("---")
 footer_html = f"""
 <div style="text-align: center; font-size: 0.8rem; color: {'#64748b' if is_light else '#94a3b8'}; padding: 12px 0;">
-    🔒 <strong>100% Private, Air-Gapped & Sovereign</strong> • All financial computations and records remain strictly on your local device.
+    🔒 <strong>Private & Secure</strong> • All financial computations and records remain strictly in your database.
 </div>
 """
 st.markdown(footer_html, unsafe_allow_html=True)

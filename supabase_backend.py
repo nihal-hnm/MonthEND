@@ -1,11 +1,4 @@
-"""Supabase Cloud backend integration for MonthEnd Sovereign FinTech.
-
-Provides full parity with database.py's SQLite layer, supporting:
-- Automatic credential resolution (.env, supabase_config.json, st.secrets, os.environ)
-- Direct PostgREST client operations via supabase-py
-- Live health checks and friendly schema diagnostics
-- Bi-directional sync between local SQLite and Supabase cloud
-"""
+"""Supabase Cloud backend integration for MonthEnd."""
 from __future__ import annotations
 
 import json

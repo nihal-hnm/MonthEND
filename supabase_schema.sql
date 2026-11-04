@@ -1,4 +1,4 @@
--- MonthEnd Sovereign FinTech: Supabase PostgreSQL Schema
+-- MonthEnd: Supabase PostgreSQL Schema
 -- Run this script in your Supabase Dashboard:
 -- 1. Open your Supabase Project
 -- 2. Go to "SQL Editor" on the left navigation bar
@@ -129,7 +129,7 @@ ALTER TABLE liability_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE savings_goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE savings_transfers ENABLE ROW LEVEL SECURITY;
 
--- Idempotent Permissive Policies for sovereign local client access
+-- Permissive Policies for client access
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'settings_policy' AND tablename = 'settings') THEN

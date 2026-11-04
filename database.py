@@ -1,11 +1,4 @@
-"""Unified Database Layer for MonthEnd Sovereign FinTech.
-
-Supports dual backends:
-1. Supabase Cloud (PostgreSQL via PostgREST / supabase-py)
-2. Local SQLite (survival_budget.db - air-gapped fallback)
-
-Caller interfaces are 100% backward-compatible.
-"""
+"""Unified Database Layer for MonthEnd."""
 from __future__ import annotations
 
 import logging
