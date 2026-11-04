@@ -26,10 +26,11 @@ from categories import (
 )
 import cycle_engine
 import database
-import supabase_backend
 from formatters import format_inr, money
 import impulse_engine
+import llm_client
 import savings_engine
+import supabase_backend
 
 logger = logging.getLogger(__name__)
 
@@ -359,6 +360,35 @@ def app(environ: dict[str, Any], start_response: Callable) -> list[bytes]:
 
             database.save_settings(payday_day, inflow_type, expected_amount, currency)
             return json_response({"success": True})
+
+        # ─── External Groq AI Guidance ─────────────────────────────────────────
+
+        if path == "/api/guidance" and method in ("GET", "POST"):
+            dash = _get_dashboard_data()
+            metrics_obj = budget_engine.BudgetMetrics(
+                total_money=Decimal(str(dash["metrics"]["total_money"])),
+                fixed_expenses=Decimal(str(dash["metrics"]["fixed_expenses"])),
+                emergency_reserve=Decimal(str(dash["metrics"]["emergency_reserve"])),
+                usable_pool=Decimal(str(dash["metrics"]["usable_pool"])),
+                daily_allowance=Decimal(str(dash["metrics"]["daily_allowance"])),
+                days=int(dash["cycle"]["total_days"]),
+                critical=bool(dash["metrics"]["critical"]),
+                feasible=bool(dash["metrics"]["feasible"]),
+                safe_daily_limit=Decimal(str(dash["metrics"]["safe_daily_limit"])),
+                days_remaining=int(dash["cycle"]["days_remaining"]),
+            )
+            cycle_ctx = f"Day {dash['cycle']['day_index']}/{dash['cycle']['total_days']}, {dash['cycle']['days_remaining']} days left"
+            try:
+                advice, _ = llm_client.generate_advice(
+                    metrics_obj,
+                    cycle_context=cycle_ctx,
+                    liabilities_context=f"Pending EMIs: ₹{dash['metrics']['pending_emis']}",
+                )
+                used_model = advice.get("_model", getattr(llm_client, "DEFAULT_MODEL", "groq-cloud"))
+                return json_response({"success": True, "advice": advice, "model": used_model})
+            except Exception as exc:
+                logger.warning("Groq AI guidance failed, returning static guide: %s", exc)
+                return json_response({"success": True, "advice": llm_client.STATIC_GUIDE, "model": "fallback", "error": str(exc)})
 
         # ─── Auth Routes ────────────────────────────────────────────────────────
 

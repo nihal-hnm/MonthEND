@@ -628,6 +628,7 @@ with tab_dash:
                             </span>
                         </div>
                         <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: {'#0284c7' if is_light else '#38bdf8'}; margin-bottom: 4px;">
+                     
                             {format_inr(lia['emi_amount'])}
                         </div>
                         <div style="font-size: 0.8rem; color: {'#64748b' if is_light else '#94a3b8'};">
@@ -1011,7 +1012,7 @@ with tab_analytics:
 
 with tab_plan:
     st.markdown("#### 📋 Budget & Meal Planning Guidance")
-    st.caption("Practical guidelines based on your cycle numbers and spending allowances.")
+    st.caption("Powered by external Groq Cloud AI Agent (GPT-OSS 120B / Qwen 3.8).")
 
     can_generate = metrics.feasible and metrics.usable_pool > 0
 

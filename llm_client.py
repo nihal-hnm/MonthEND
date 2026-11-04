@@ -1,31 +1,30 @@
-"""Local-only Ollama integration. No remote provider or telemetry is used.
+"""External AI Agent integration powered by Groq Cloud API (Llama 3.3 70B).
 
-Extended with cycle context, liability info, savings goals, and impulse patterns.
+High-speed cloud inference replacing local Ollama execution:
+- Uses Groq's LPUs for ultra-fast response times (~300ms)
+- Native JSON mode enforcement
+- Automatic credential resolution (os.environ, .env, st.secrets, fallback)
+- Full financial context awareness (cycle status, EMIs, savings goals, impulse velocity)
 """
+from __future__ import annotations
+
 import json
+import logging
+import os
 import re
+from pathlib import Path
+from typing import Any, Optional
+
 import requests
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
-MODEL = "qwen2.5:7b"
+logger = logging.getLogger(__name__)
 
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+DEFAULT_MODEL = "openai/gpt-oss-120b"
+FALLBACK_MODELS = ["qwen/qwen3.8-27b", "openai/gpt-oss-20b"]
 
-def get_available_model():
-    """Detect available local Ollama model without remote internet."""
-    global MODEL
-    try:
-        r = requests.get(OLLAMA_TAGS_URL, timeout=1.5)
-        if r.status_code == 200:
-            installed = [m.get("name", "") for m in r.json().get("models", [])]
-            for candidate in ["qwen2.5:7b", "qwen2.5-coder:7b", "qwen2.5:latest", "gemma4:e4b"]:
-                if candidate in installed:
-                    return candidate
-            if installed:
-                return installed[0]
-    except Exception:
-        pass
-    return MODEL
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+CONFIG_PATH = Path(__file__).resolve().parent / "groq_config.json"
 
 STATIC_GUIDE = {
     "summary": "Track every ₹ spent, protect your emergency reserve, and review your daily safe limit before each spend.",
@@ -54,131 +53,219 @@ STATIC_GUIDE = {
 
 
 class LLMError(RuntimeError):
+    """Raised when the external Groq AI agent fails or cannot be reached."""
     pass
 
 
-def build_prompt(metrics, pantry="", lifestyle="", location="",
-                 critical=None, cycle_context=None, liabilities_context=None,
-                 savings_context=None, impulse_context=None):
-    """Build the LLM prompt with full financial context."""
-    critical = metrics.critical if critical is None else critical
+def get_groq_api_key() -> str:
+    """Resolve Groq API key from environment, .env file, groq_config.json, or st.secrets."""
+    # 1. Environment variable
+    if os.environ.get("GROQ_API_KEY"):
+        return os.environ["GROQ_API_KEY"].strip()
+
+    # 2. Streamlit secrets (if available)
+    try:
+        import streamlit as st  # type: ignore
+        if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
+            return str(st.secrets["GROQ_API_KEY"]).strip()
+    except Exception:
+        pass
+
+    # 3. Read .env file
+    if ENV_PATH.exists():
+        try:
+            with open(ENV_PATH, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("GROQ_API_KEY="):
+                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if val:
+                            return val
+        except Exception as exc:
+            logger.debug("Failed reading .env for GROQ_API_KEY: %s", exc)
+
+    # 4. Read uncommitted groq_config.json (if present)
+    if CONFIG_PATH.exists():
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                val = data.get("api_key") or data.get("GROQ_API_KEY")
+                if val:
+                    return str(val).strip()
+        except Exception as exc:
+            logger.debug("Failed reading groq_config.json: %s", exc)
+
+    return ""
+
+
+def build_system_prompt(critical: bool = False) -> str:
     austerity = (
-        "CRITICAL: allowance is below ₹200/day. Focus on mess/tiffin, home-cooked bulk meals (dal-rice, khichdi), and eliminating all discretionary spend. "
+        "CRITICAL: Daily allowance is below ₹200/day. Focus on mess/tiffin, bulk dal-rice cooking, and eliminating all discretionary spend. "
         if critical else ""
     )
-
-    data = {
-        "days": metrics.days,
-        "daily_allowance": str(metrics.daily_allowance),
-        "usable_pool": str(metrics.usable_pool),
-        "safe_daily_limit": str(getattr(metrics, 'safe_daily_limit', metrics.daily_allowance)),
-        "pantry": pantry,
-        "lifestyle": lifestyle,
-        "region": location or "India",
-    }
-
-    # Add extended context (keep it compact for 2048 token window)
-    if cycle_context:
-        data["cycle"] = cycle_context
-    if liabilities_context:
-        data["emis"] = liabilities_context
-    if savings_context:
-        data["goals"] = savings_context
-    if impulse_context:
-        data["impulse_pattern"] = impulse_context
-
     return (
-        "You are a pragmatic Indian personal finance assistant. Return one JSON object only with keys: "
-        "summary (string), meal_plan (array of objects with meal and idea), "
-        "pantry_tips (array of strings), spending_limits (array of strings), "
-        "emergency_tradeoffs (array of strings), disclaimer (string). "
-        "All amounts in ₹ (Indian Rupees). Use Indian context: mess/tiffin, kirana, "
-        "UPI payments, Blinkit/Zepto, Zomato/Swiggy, metro/auto fares. "
-        "Never do arithmetic or invent prices. "
+        "You are a pragmatic, direct personal finance advisor specializing in Indian cost of living. "
+        "Return one valid JSON object only with the following keys:\n"
+        "- summary (string): Actionable 2-sentence executive guidance.\n"
+        "- meal_plan (array of objects with 'meal' and 'idea'): Practical low-cost Indian meals (breakfast, lunch, dinner).\n"
+        "- pantry_tips (array of strings): High-impact bulk grocery/kirana savings tips.\n"
+        "- spending_limits (array of strings): Specific rules to prevent impulse spending.\n"
+        "- emergency_tradeoffs (array of strings): Clear priorities for bill payments and essential outflows.\n"
+        "- disclaimer (string): Brief standard disclaimer.\n"
+        "All figures in Indian Rupees (₹). Ground advice in everyday Indian realities: kirana staples, PG/mess fees, "
+        "UPI payment habits, quick-commerce traps (Blinkit/Zepto), food delivery (Zomato/Swiggy), transit (Metro/Auto). "
+        "Never advise skipping essential medical treatment or inadequate nutrition below 1,200 calories/day. "
         f"{austerity}"
-        "Suggest practical, low-cost Indian meals. Never recommend a diet below 1,200 calories/day; "
-        "if budget constraints make adequate calories difficult, state severe health risks and direct to "
-        "local food assistance. Never advise skipping essential medication. "
-        f"Context: {json.dumps(data, ensure_ascii=False)}"
     )
 
 
-def _extract_json(text):
+def build_user_context(metrics: Any, pantry: str = "", lifestyle: str = "", location: str = "",
+                       cycle_context: Optional[str] = None, liabilities_context: Optional[str] = None,
+                       savings_context: Optional[str] = None, impulse_context: Optional[str] = None) -> str:
+    data: dict[str, Any] = {
+        "days_remaining": getattr(metrics, "days_remaining", metrics.days),
+        "total_days_in_cycle": metrics.days,
+        "daily_allowance": str(metrics.daily_allowance),
+        "safe_daily_limit": str(getattr(metrics, "safe_daily_limit", metrics.daily_allowance)),
+        "usable_pool": str(metrics.usable_pool),
+        "fixed_expenses": str(metrics.fixed_expenses),
+        "emergency_reserve": str(metrics.emergency_reserve),
+        "region": location or "India",
+    }
+    if pantry:
+        data["pantry_at_home"] = pantry
+    if lifestyle:
+        data["lifestyle_notes"] = lifestyle
+    if cycle_context:
+        data["cycle_context"] = cycle_context
+    if liabilities_context:
+        data["active_emis"] = liabilities_context
+    if savings_context:
+        data["savings_goals"] = savings_context
+    if impulse_context:
+        data["impulse_history"] = impulse_context
+
+    return f"Evaluate this financial situation and provide tailored guidance in JSON:\n{json.dumps(data, ensure_ascii=False)}"
+
+
+def _extract_json(text: str) -> dict[str, Any]:
     text = text.strip()
     try:
-        return json.loads(text)
+        res = json.loads(text)
+        if isinstance(res, dict):
+            return res
     except (json.JSONDecodeError, TypeError):
         pass
 
     match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     if match:
         try:
-            return json.loads(match.group(1))
+            res = json.loads(match.group(1))
+            if isinstance(res, dict):
+                return res
         except (json.JSONDecodeError, TypeError):
             pass
 
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         try:
-            return json.loads(match.group(0))
+            res = json.loads(match.group(0))
+            if isinstance(res, dict):
+                return res
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # If truncated at the end, attempt to close braces
     for suffix in ["}", '"]}', '"}]}', '"}]}']:
         try:
-            return json.loads(text + suffix)
+            res = json.loads(text + suffix)
+            if isinstance(res, dict):
+                return res
         except (json.JSONDecodeError, TypeError):
             continue
 
-    raise ValueError(f"Could not extract valid JSON from response: {text[:200]}...")
+    raise ValueError(f"Could not parse valid JSON from response: {text[:200]}")
 
 
-def generate_advice(metrics, pantry="", lifestyle="", location="", timeout=90,
-                    cycle_context=None, liabilities_context=None,
-                    savings_context=None, impulse_context=None):
-    """Generate personalized budget advice via local Ollama."""
+def generate_advice(metrics: Any, pantry: str = "", lifestyle: str = "", location: str = "", timeout: int = 30,
+                    cycle_context: Optional[str] = None, liabilities_context: Optional[str] = None,
+                    savings_context: Optional[str] = None, impulse_context: Optional[str] = None) -> tuple[dict[str, Any], str]:
+    """Generate personalized budget guidance via Groq Cloud API."""
     if metrics.usable_pool <= 0 or not metrics.feasible:
-        raise LLMError("LLM generation is disabled because no positive usable budget remains.")
-    if timeout <= 0:
-        timeout = 90
+        raise LLMError("AI generation is disabled because no positive usable budget remains.")
 
-    active_model = get_available_model()
-    payload = {
-        "model": active_model,
-        "prompt": build_prompt(
-            metrics, pantry, lifestyle, location,
-            cycle_context=cycle_context,
-            liabilities_context=liabilities_context,
-            savings_context=savings_context,
-            impulse_context=impulse_context,
-        ),
-        "stream": False,
-        "format": "json",
-        "options": {
-            "temperature": 0.2,
-            "num_ctx": 2048,
-            "num_predict": 1024,
-            "num_gpu": 99,
-        },
+    api_key = get_groq_api_key()
+    if not api_key:
+        raise LLMError("Groq API key is not configured.")
+
+    system_prompt = build_system_prompt(critical=bool(getattr(metrics, "critical", False)))
+    user_context = build_user_context(
+        metrics, pantry, lifestyle, location,
+        cycle_context=cycle_context,
+        liabilities_context=liabilities_context,
+        savings_context=savings_context,
+        impulse_context=impulse_context,
+    )
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
     }
+
+    payload: dict[str, Any] = {
+        "model": DEFAULT_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_context},
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.2,
+        "max_tokens": 1200,
+    }
+
+    models_to_try = [DEFAULT_MODEL] + [m for m in FALLBACK_MODELS if m != DEFAULT_MODEL]
+    last_error: Optional[Exception] = None
+    response: Optional[requests.Response] = None
+    used_model = DEFAULT_MODEL
+
+    for model_name in models_to_try:
+        payload["model"] = model_name
+        try:
+            resp = requests.post(GROQ_URL, headers=headers, json=payload, timeout=timeout)
+            if resp.status_code in (400, 404, 429, 500, 502, 503):
+                logger.info("Model %s returned HTTP %s, trying fallback...", model_name, resp.status_code)
+                continue
+            resp.raise_for_status()
+            response = resp
+            used_model = model_name
+            break
+        except requests.RequestException as exc:
+            last_error = exc
+            logger.warning("Groq request failed for model %s: %s", model_name, exc)
+            continue
+
+    if response is None:
+        raise LLMError(f"Groq API connection error: {last_error or 'All candidate models failed'}")
+
     try:
-        response = requests.post(OLLAMA_URL, json=payload, timeout=timeout)
-        response.raise_for_status()
-        result = response.json()
-        raw = result.get("response", "")
-        advice = _extract_json(raw)
-        if not isinstance(advice, dict):
-            raise ValueError("The model returned non-dictionary JSON.")
+        res_json = response.json()
+        choices = res_json.get("choices", [])
+        if not choices:
+            raise ValueError("Groq returned an empty choice set.")
 
-        # Ensure all core sections are populated; fill any missing section with fallback
-        for k in ["summary", "meal_plan", "pantry_tips", "spending_limits", "emergency_tradeoffs"]:
-            if k not in advice or not advice[k]:
-                advice[k] = STATIC_GUIDE.get(k, [])
+        raw_content = choices[0].get("message", {}).get("content", "")
+        advice = _extract_json(raw_content)
 
-        return advice, raw
+        # Fill any missing section with standard fallback
+        for key in ["summary", "meal_plan", "pantry_tips", "spending_limits", "emergency_tradeoffs"]:
+            if key not in advice or not advice[key]:
+                advice[key] = STATIC_GUIDE.get(key, [])
+
+        advice["_model"] = used_model
+        return advice, raw_content
+
     except requests.RequestException as exc:
-        raise LLMError(f"Ollama is unavailable or timed out ({exc})") from exc
+        logger.warning("Groq API request failed: %s", exc)
+        raise LLMError(f"Groq API connection error: {exc}") from exc
     except (ValueError, json.JSONDecodeError) as exc:
-        raw = locals().get("raw", "")
-        raise LLMError(f"Could not validate the model response: {exc}\n{raw[:300]}") from exc
+        logger.warning("Failed parsing Groq response: %s", exc)
+        raise LLMError(f"Could not parse Groq response: {exc}") from exc

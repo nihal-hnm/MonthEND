@@ -20,5 +20,6 @@ Thumbs.db
 pyrightconfig.json
 .env
 supabase_config.json
+groq_config.json
 scratch/
 

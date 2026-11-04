@@ -479,6 +479,22 @@
             <div style="color: var(--text-dim); font-size: 13px;">Spending is within normal range across all categories.</div>
           </div>
         </div>
+
+        <!-- Groq AI Advisor Panel -->
+        <div class="panel" style="grid-column: 1 / -1;">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">Groq AI Financial Guidance</h3>
+              <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Powered by External Groq Cloud AI Agent (GPT-OSS 120B / Qwen 3.8)</p>
+            </div>
+            <button class="btn btn-emerald btn-sm" id="btn-groq-generate" onclick="handleGenerateGroqGuidance()">
+              <span id="groq-btn-text">Generate Guidance</span>
+            </button>
+          </div>
+          <div id="groq-guidance-container" style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+            Click "Generate Guidance" to analyze your cycle limits, liabilities, and grocery/dining habits using Groq.
+          </div>
+        </div>
       </div>
     </section>
 
@@ -830,6 +846,54 @@
       document.getElementById("inflow-amount").value = "";
       alert("Income logged.");
       await loadDashboard();
+    }
+
+    async function handleGenerateGroqGuidance() {
+      const container = document.getElementById("groq-guidance-container");
+      const btnText = document.getElementById("groq-btn-text");
+      btnText.innerText = "Analyzing on Groq...";
+      container.innerHTML = `<div style="color: var(--emerald-light); padding: 8px 0;">Consulting Groq Cloud AI Agent with cycle telemetry...</div>`;
+
+      try {
+        const res = await fetch("/api/guidance");
+        const data = await res.json();
+        if (data.success && data.advice) {
+          const adv = data.advice;
+          const modelBadge = data.model ? `<span style="font-size: 11px; padding: 2px 6px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 4px; color: var(--emerald-light); margin-left: 8px;">${data.model}</span>` : "";
+          const meals = (adv.meal_plan || []).map(m => `<li><strong>${m.meal}:</strong> ${m.idea}</li>`).join("");
+          const pantry = (adv.pantry_tips || []).map(p => `<li>${p}</li>`).join("");
+          const limits = (adv.spending_limits || []).map(s => `<li>${s}</li>`).join("");
+
+          container.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 14px; color: var(--text);">
+              <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid var(--emerald); padding: 10px 14px; border-radius: 4px; font-weight: 500; display: flex; justify-content: space-between; align-items: center;">
+                <span>${adv.summary || 'Summary unavailable.'}</span>
+                ${modelBadge}
+              </div>
+              <div class="grid-2" style="gap: 16px;">
+                <div>
+                  <h5 style="color: #ffffff; font-weight: 600; margin-bottom: 6px;">Budget Meal Framework</h5>
+                  <ul style="padding-left: 18px; line-height: 1.7; font-size: 13px; color: #cbd5e1;">${meals || '<li>Standard mess/batch meals.</li>'}</ul>
+                </div>
+                <div>
+                  <h5 style="color: #ffffff; font-weight: 600; margin-bottom: 6px;">Pantry & Kirana Rules</h5>
+                  <ul style="padding-left: 18px; line-height: 1.7; font-size: 13px; color: #cbd5e1;">${pantry || '<li>Buy staples in monthly bulk.</li>'}</ul>
+                </div>
+              </div>
+              <div>
+                <h5 style="color: #ffffff; font-weight: 600; margin-bottom: 6px;">Spending Boundaries</h5>
+                <ul style="padding-left: 18px; line-height: 1.7; font-size: 13px; color: #cbd5e1;">${limits || '<li>Stick to your safe daily allowance.</li>'}</ul>
+              </div>
+            </div>
+          `;
+        } else {
+          container.innerHTML = `<div style="color: #fca5a5;">Failed to load guidance: ${data.error || 'Unknown error'}</div>`;
+        }
+      } catch (err) {
+        container.innerHTML = `<div style="color: #fca5a5;">Connection error reaching Groq API endpoint.</div>`;
+      } finally {
+        btnText.innerText = "Re-generate Guidance";
+      }
     }
 
     function checkAuthStatus() {
